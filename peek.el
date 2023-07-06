@@ -50,10 +50,11 @@ NOTE: currently only support 'overlay'"
   :group 'peek)
 
 (defface peek-overlay-border-face
-  '((((background light))
-     :height 1 :background "#95a5a6" :extend t)
-    (t
-     :height 1 :background "#ecf0f1" :extend t))
+  ;; '((((background light))
+  ;;    :inherit font-lock-doc-face :foreground "#95a5a6")
+  ;;   (t
+  ;;    :inherit font-lock-doc-face :foreground "#ecf0f1"))
+  '((t (:inherit font-lock-doc-face)))
   "Face used for borders of peek overlay window."
   :group 'peek)
 
@@ -105,10 +106,12 @@ Return nil if region is not active."
 
 (defun peek-overlay--format-make-border ()
   "Return the border string which is supposed to be used in overlay."
-  (if (display-graphic-p)
-      (propertize "\n" 'face 'peek-overlay-border-face)
-    ;; TODO terminal border
-    ""))
+  ;; note that `display-line-numbers-mode'
+  (let ((total-column-number (- (window-body-width) (+ 2 (line-number-display-width)))))
+    (line-number-display-width)
+    (propertize
+     (concat (make-string total-column-number ?-) "\n")
+     'face 'peek-overlay-border-face)))
 
 (defun peek-overlay--format-content (str)
   "Format peek overlay content and return the formatted string.
@@ -181,8 +184,8 @@ Else toggle the display of the overlay."
 Return position."
   (save-excursion
     (cl-case peek-overlay-position
-      ('above (forward-line (- peek-overlay-distance)))
-      ('below (forward-line (1+ peek-overlay-distance))))
+      (above (forward-line (- peek-overlay-distance)))
+      (below (forward-line (1+ peek-overlay-distance))))
     (point)))
 
 (define-minor-mode peek-mode
