@@ -106,8 +106,8 @@ Return nil if region is not active."
 
 (defun peek-overlay--format-make-border ()
   "Return the border string which is supposed to be used in overlay."
-  ;; note that `display-line-numbers-mode'
-  (let ((total-column-number (window-body-width)))
+  ;; note that `display-line-numbers-mode' takes 2 + `line-number-display-width' columns
+  (let ((total-column-number (1- (window-body-width)))) ;; terminal Emacs will pad '\' at the line end
     (when display-line-numbers-mode
       (setq total-column-number
             (- total-column-number (+ 2 (line-number-display-width)))))
