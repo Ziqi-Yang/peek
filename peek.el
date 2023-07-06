@@ -28,28 +28,47 @@
 ;;; Code:
 
 (defgroup peek nil
-  "Peek mode"
+  "Peek mode."
   :group 'convenient)
+
+(defcustom peek-preferred-method "overlay"
+  "Preferred method to display peek window."
+  :type '(choice (const :tag "use overlay" "overlay")
+                 (const :tag "use child frame" "frame"))
+  :group 'peek)
 
 (defvar peek-window-overlay-map
   (make-hash-table :test 'equal)
   "This variable stores overlay for each window")
 
-(defun peek-clean-dead-overlays()
+(defun peek-clean-dead-overlays ()
   "This function clean those overlays existed in dead windows.
-It should be hooked at `window-state-change-hook'"
+It should be hooked at `window-state-change-hook'."
   (while-let ((windows (hash-table-keys peek-window-overlay-map)))
     (when-let ((window (pop windows))
                ((window-live-p window)))
-      (delete-overlay (gethash window peek-window-overlay-map))
-      (remhash window peek-window-overlay-map))))
+      (peek-delete-window-overlay window))))
 
-(defun peek-get-current-overlay()
-  "Get overlay at current window."
-  (gethash (get-buffer-window) peek-window-overlay-map))
+(defun peek-get-window-overlay (&optional window)
+  "Get the overlay inside WINDOW.
+If WINDOW is nil, then get the overlay inside the current window.
+Return nil if there is no overlay in the window"
+  (let ((w (if (windowp window) ;; no matter live or not
+               window
+             (get-buffer-window))))
+    (gethash w peek-window-overlay-map)))
+
+(defun peek-delete-window-overlay (&optional WINDOW)
+  "Delete the overlay inside WINDOW.
+If WINDOW is nil, then delete the overlay inside the current window."
+  (let ((w (if (windowp window) ;; no matter live or not
+               window
+             (get-buffer-window))))
+    (delete-overlay (gethash w peek-window-overlay-map))
+    (remhash w peek-window-overlay-map)))
 
 (defun peek-create-overlay(pos)
-  "Create overlay for currently window"
+  "Create overlay for currently window."
   (let ((peek--ol (make-overlay pos pos)))
     (overlay-put peek--ol 'window (get-buffer-window))
     (puthash (get-buffer-window) peek--ol peek-window-overlay-map)))
@@ -60,10 +79,10 @@ It should be hooked at `window-state-change-hook'"
   :lighter "peek"
   (cond
    (peek-mode
-    ;; TODO
-    )
+    (add-hook 'window-state-change-hook peek-clean-dead-overlays))
    (t
     ;; TODO
+    (remove-hook 'window-state-change-hook peek-clean-dead-overlays)
     )))
 
 (provide 'peek)
