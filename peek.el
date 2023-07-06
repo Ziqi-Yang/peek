@@ -107,8 +107,10 @@ Return nil if region is not active."
 (defun peek-overlay--format-make-border ()
   "Return the border string which is supposed to be used in overlay."
   ;; note that `display-line-numbers-mode'
-  (let ((total-column-number (- (window-body-width) (+ 2 (line-number-display-width)))))
-    (line-number-display-width)
+  (let ((total-column-number (window-body-width)))
+    (when display-line-numbers-mode
+      (setq total-column-number
+            (- total-column-number (+ 2 (line-number-display-width)))))
     (propertize
      (concat (make-string total-column-number ?-) "\n")
      'face 'peek-overlay-border-face)))
