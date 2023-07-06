@@ -38,7 +38,7 @@ NOTE: currently only support 'overlay'"
                  (const :tag "use child frame" frame))
   :group 'peek)
 
-(defcustom peek-overlay-position 'above
+(defcustom peek-overlay-position 'below
   "Specify whether the overlay should be laid above the point or below the point"
   :type '(choice (const :tag "above the point" above)
                  (const :tag "below the point" below))
@@ -81,13 +81,12 @@ If WINDOW is nil, then delete the overlay inside the current window."
 
 (defun peek-create-overlay (pos &optional active)
   "Create overlay for currently window.
-Active parameter specify that whether the overlay should be visible. (can be manually changed later)
 By default, the custom 'active' property of the overlay is nil.
 Return the newly created overlay."
   (when-let (((not (minibufferp))) ;; not in a mini-buffer
              (ol (make-overlay pos pos)))
     (overlay-put ol 'window (get-buffer-window))
-    (overlay-put ol 'active active)
+    (overlay-put ol 'active nil)
     (puthash (get-buffer-window) ol peek-window-overlay-map)))
 
 (defun peek--get-active-region-text ()
@@ -96,38 +95,57 @@ Return nil if region is not active."
   (when (use-region-p)
     (buffer-substring (region-beginning) (region-end))))
 
-(defun peek-overlay--toggle-active (ol)
-  "Toggle the visibility of the given overlay"
-  (when (overlayp ol)
-    (if (overlay-get ol 'active)
-        (overlay-put ol 'active nil)
-      (overlay-put ol 'active t))))
+(defun peek-overlay--set-content (ol str)
+  "Set the content for OL.
+OL: overlay."
+  ;; set `after-string' property according to current `active' property
+  (let ((display (if (overlay-get ol 'active) 
+                     nil
+                   "")))
+    (overlay-put ol 'after-string
+                 (propertize str 'display display))))
 
-(defun peek-overlay--toggle-active-dwim (ol)
-  "Toggle the visibility of the given overlay according to what I mean.
-If the overlay's `after-string' property is nil, then the visibility of the given overlay won't toggle."
-  (when (overlay-get ol 'after-string)
-    (peek-overlay--toggle-active ol)))
+(defun peek-overlay--set-active (ol active)
+  "Set active/visibility of the given overlay.
+OL: overlay object
+ACTIVE: boolean type: t stands for visible, nil stands for invisible
+Please ensure `after-string' property of OL isn't nil, otherwise this function does nothing."
+  (when-let (((booleanp active)) ;; ensure `active' is nil or t
+             (after-str (overlay-get ol 'after-string))) ;; ensure after-str isn't nil
+    (if active
+        (progn
+          (overlay-put ol 'active t)
+          (overlay-put ol 'after-string (propertize after-str 'display nil)))
+      (progn
+        (overlay-put ol 'active nil)
+        (overlay-put ol 'after-string (propertize after-str 'display ""))))))
+
+(defun peek-overlay--toggle-active (ol)
+  "Set active/visibility of the given overlay.
+OL: overlay object
+Please ensure `after-string' property of OL isn't nil, otherwise this function does nothing."
+  (if (overlay-get ol 'active)
+      (peek-overlay--set-active ol nil)
+    (peek-overlay--set-active ol t)))
 
 (defun peek-overlay-dwim ()
   "Peek overlay do what I mean.
-If there is a active region, then store the region into the overlay in the current window;
-Else display the overlay in the current window."
+If there is an active region, then store the region into the overlay in the current window;
+Else toggle the display of the overlay."
   (interactive)
   (let ((ol (peek-get-window-overlay)))
     (unless ol
       (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
     (if (use-region-p)
-        (overlay-put ol 'after-string (peek--get-active-region-text)) ;; TODO add decoration
-      (peek-overlay--toggle-active-dwim ol))
-    (when (overlay-get ol 'active)
-      (peek-display--overlay-update))))
+        (peek-overlay--set-content ol (peek--get-active-region-text))
+      (peek-overlay--toggle-active ol))
+    (peek-display--overlay-update)))
 
 (defun peek-display--overlay-update ()
   "Update the overlay position in the current window if overlay is active."
   (when-let ((ol (peek-get-window-overlay))
-             ((overlay-get ol 'active))
-             (pos (peek-overlay--get-supposed-position))) ;; when overlay is active/visible
+             ((overlay-get ol 'active)) ;; only update when overlay is active/visible
+             (pos (peek-overlay--get-supposed-position))) 
     (move-overlay ol pos pos)))
 
 (defun peek-overlay--get-supposed-position ()
