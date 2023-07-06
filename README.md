@@ -8,8 +8,8 @@
 
 Overlay: 
 1. [inline-docs](https://repo.or.cz/inline-docs.git/blob/HEAD:/inline-docs.el)
-2. [quick-peek](https://github.com/cpitclaudel/quick-peek)
-3. [citre](https://github.com/universal-ctags/citre/blob/master/citre-ui-peek.el)
+2. [citre](https://github.com/universal-ctags/citre/blob/master/citre-ui-peek.el)
+3. [quick-peek](https://github.com/cpitclaudel/quick-peek)
 4. [lsp-ui](https://github.com/emacs-lsp/lsp-ui/blob/master/lsp-ui-peek.el)
 
 Child Frame:

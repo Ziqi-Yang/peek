@@ -49,6 +49,14 @@ NOTE: currently only support 'overlay'"
   :type 'natnum
   :group 'peek)
 
+(defface peek-overlay-border-face
+  '((((background light))
+     :height 1 :background "#95a5a6" :extend t)
+    (t
+     :height 1 :background "#ecf0f1" :extend t))
+  "Face used for borders of peek overlay window."
+  :group 'peek)
+
 (defvar peek-window-overlay-map
   (make-hash-table :test 'equal)
   "Variable structure: { window: overlay }")
@@ -95,15 +103,35 @@ Return nil if region is not active."
   (when (use-region-p)
     (buffer-substring (region-beginning) (region-end))))
 
+(defun peek-overlay--format-make-border ()
+  "Return the border string which is supposed to be used in overlay."
+  (if (display-graphic-p)
+      (propertize "\n" 'face 'peek-overlay-border-face)
+    ;; TODO terminal border
+    ""))
+
+(defun peek-overlay--format-content (str)
+  "Format peek overlay content and return the formatted string.
+STR: the content string.
+Return: formatted string which is supposed to be inserted into overlay."
+  (let ((border (peek-overlay--format-make-border)))
+    (concat
+     "\n" border
+     str 
+     "\n" border "\n")))
+
 (defun peek-overlay--set-content (ol str)
   "Set the content for OL.
-OL: overlay."
+OL: overlay.
+STR: original content string. It will be formatted using `peek-overlay--format-content' method before
+being inserted into OL."
   ;; set `after-string' property according to current `active' property
   (let ((display (if (overlay-get ol 'active) 
                      nil
-                   "")))
+                   ""))
+        (content (peek-overlay--format-content str)))
     (overlay-put ol 'after-string
-                 (propertize str 'display display))))
+                 (propertize content 'display display))))
 
 (defun peek-overlay--set-active (ol active)
   "Set active/visibility of the given overlay.
@@ -152,11 +180,9 @@ Else toggle the display of the overlay."
   "Get the supposed position of the overlay in current window based `peek-overlay-position' and `peek-overlay-distance'.
 Return position."
   (save-excursion
-    (cond
-     ((eq peek-overlay-position 'above)
-      (forward-line (- peek-overlay-distance)))
-     ((eq peek-overlay-distance 'below)
-      (forward-line (1+ peek-overlay-distance))))
+    (cl-case peek-overlay-position
+      ('above (forward-line (- peek-overlay-distance)))
+      ('below (forward-line (1+ peek-overlay-distance))))
     (point)))
 
 (define-minor-mode peek-mode
