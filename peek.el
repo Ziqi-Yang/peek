@@ -31,15 +31,27 @@
   "Peek mode."
   :group 'convenient)
 
-(defcustom peek-preferred-method "overlay"
-  "Preferred method to display peek window."
-  :type '(choice (const :tag "use overlay" "overlay")
-                 (const :tag "use child frame" "frame"))
+(defcustom peek-method 'overlay
+  "Preferred method to display peek window.
+NOTE: currently only support 'overlay'"
+  :type '(choice (const :tag "use overlay" overlay)
+                 (const :tag "use child frame" frame))
+  :group 'peek)
+
+(defcustom peek-overlay-position 'above
+  "Specify whether the overlay should be laid above the point or below the point"
+  :type '(choice (const :tag "above the point" above)
+                 (const :tag "below the point" below))
+  :group 'peek)
+
+(defcustom peek-overlay-distance 1
+  "Number of the lines between the peek overlay window and the point. 0 means the current line."
+  :type 'natnum
   :group 'peek)
 
 (defvar peek-window-overlay-map
   (make-hash-table :test 'equal)
-  "This variable stores overlay for each window")
+  "Variable structure: { window: overlay }")
 
 (defun peek-clean-dead-overlays ()
   "This function clean those overlays existed in dead windows.
@@ -67,11 +79,67 @@ If WINDOW is nil, then delete the overlay inside the current window."
     (delete-overlay (gethash w peek-window-overlay-map))
     (remhash w peek-window-overlay-map)))
 
-(defun peek-create-overlay(pos)
-  "Create overlay for currently window."
-  (let ((peek--ol (make-overlay pos pos)))
-    (overlay-put peek--ol 'window (get-buffer-window))
-    (puthash (get-buffer-window) peek--ol peek-window-overlay-map)))
+(defun peek-create-overlay (pos &optional active)
+  "Create overlay for currently window.
+Active parameter specify that whether the overlay should be visible. (can be manually changed later)
+By default, the custom 'active' property of the overlay is nil.
+Return the newly created overlay."
+  (when-let (((not (minibufferp))) ;; not in a mini-buffer
+             (ol (make-overlay pos pos)))
+    (overlay-put ol 'window (get-buffer-window))
+    (overlay-put ol 'active active)
+    (puthash (get-buffer-window) ol peek-window-overlay-map)))
+
+(defun peek--get-active-region-text ()
+  "Get text with properties in region.
+Return nil if region is not active."
+  (when (use-region-p)
+    (buffer-substring (region-beginning) (region-end))))
+
+(defun peek-overlay--toggle-active (ol)
+  "Toggle the visibility of the given overlay"
+  (when (overlayp ol)
+    (if (overlay-get ol 'active)
+        (overlay-put ol 'active nil)
+      (overlay-put ol 'active t))))
+
+(defun peek-overlay--toggle-active-dwim (ol)
+  "Toggle the visibility of the given overlay according to what I mean.
+If the overlay's `after-string' property is nil, then the visibility of the given overlay won't toggle."
+  (when (overlay-get ol 'after-string)
+    (peek-overlay--toggle-active ol)))
+
+(defun peek-overlay-dwim ()
+  "Peek overlay do what I mean.
+If there is a active region, then store the region into the overlay in the current window;
+Else display the overlay in the current window."
+  (interactive)
+  (let ((ol (peek-get-window-overlay)))
+    (unless ol
+      (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
+    (if (use-region-p)
+        (overlay-put ol 'after-string (peek--get-active-region-text)) ;; TODO add decoration
+      (peek-overlay--toggle-active-dwim ol))
+    (when (overlay-get ol 'active)
+      (peek-display--overlay-update))))
+
+(defun peek-display--overlay-update ()
+  "Update the overlay position in the current window if overlay is active."
+  (when-let ((ol (peek-get-window-overlay))
+             ((overlay-get ol 'active))
+             (pos (peek-overlay--get-supposed-position))) ;; when overlay is active/visible
+    (move-overlay ol pos pos)))
+
+(defun peek-overlay--get-supposed-position ()
+  "Get the supposed position of the overlay in current window based `peek-overlay-position' and `peek-overlay-distance'.
+Return position."
+  (save-excursion
+    (cond
+     ((eq peek-overlay-position 'above)
+      (forward-line (- peek-overlay-distance)))
+     ((eq peek-overlay-distance 'below)
+      (forward-line (1+ peek-overlay-distance))))
+    (point)))
 
 (define-minor-mode peek-mode
   "Gloabl peek mode."
