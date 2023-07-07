@@ -177,6 +177,31 @@ Please ensure `after-string' property of OL isn't nil, otherwise this function d
     (let ((window (pop windows)))
       (peek-delete-window-overlay window))))
 
+;;;###autoload
+(defun peek-overlay-show (&optional window)
+  "Provide API to show peek overlay.Only toggle overlay when it has content.
+If WINDOW is nil, then show overlay in the current window."
+  (interactive)
+  (let ((ol (peek-get-window-overlay window)))
+    (peek-overlay--set-active ol t)))
+
+;;;###autoload
+(defun peek-overlay-hide (&optional window)
+  "Provide API to show peek overlay. Only toggle overlay when it has content.
+If WINDOW is nil, then show overlay in the current window."
+  (interactive)
+  (let ((ol (peek-get-window-overlay window)))
+    (peek-overlay--set-active ol nil)))
+
+;;;###autoload
+(defun peek-overlay-toggle (&optional window)
+  "Provide API to toggle peek overlay. Only toggle overlay when it has content.
+If WINDOW is nil, then show overlay in the current window."
+  (interactive)
+  (let ((ol (peek-get-window-overlay window)))
+    (peek-overlay--toggle-active ol)))
+
+;;;###autoload
 (defun peek-overlay-dwim ()
   "Peek overlay do what I mean.
 If there is an active region, then store the region into the overlay in the current window;
@@ -208,6 +233,7 @@ Return position."
       (below (forward-line (1+ peek-overlay-distance))))
     (point)))
 
+;;;###autoload
 (define-minor-mode global-peek-mode
   "Gloabl peek mode."
   :global t
