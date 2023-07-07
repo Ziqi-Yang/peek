@@ -64,7 +64,7 @@ NOTE: currently only support 'overlay'"
   :type 'natnum
   :group 'peek)
 
-(defcustom peek-xref-surrounding-below-lines 15
+(defcustom peek-xref-surrounding-below-lines 10
   "Number of lines below the definition found by xref to be shown in the peek window."
   :type 'natnum
   :group 'peek)
@@ -145,10 +145,13 @@ Return nil if region is not active."
       (setq mark-active nil) ;; deactivate region mark
       text)))
 
-(defun peek-overlay--format-make-border ()
+(defun peek-overlay--format-make-border (&optional borderlen)
   "Return the border string which is supposed to be used in overlay."
   ;; note that `display-line-numbers-mode' takes 2 + `line-number-display-width' columns
-  (let ((total-column-number (1- (window-body-width)))) ;; terminal Emacs will pad '\' at the line end
+  (let* ((window-body-width (if borderlen
+                                borderlen
+                              (window-body-width)))
+         (total-column-number (1- window-body-width))) ;; terminal Emacs will pad '\' at the line end
     (when display-line-numbers-mode
       (setq total-column-number
             (- total-column-number (+ 2 (line-number-display-width)))))
@@ -156,11 +159,11 @@ Return nil if region is not active."
      (concat (make-string total-column-number peek-overlay-border-symbol) "\n")
      'face 'peek-overlay-border-face)))
 
-(defun peek-overlay--format-content (str)
+(defun peek-overlay--format-content (str &optional borderlen)
   "Format peek overlay content and return the formatted string.
 STR: the content string.
 Return: formatted string which is supposed to be inserted into overlay."
-  (let ((border (peek-overlay--format-make-border))
+  (let ((border (peek-overlay--format-make-border borderlen))
         (strlen (length str)))
     ;; `default' face is appended to make sure the display in overlay
     ;; is not affected by its surroundings.
@@ -171,7 +174,7 @@ Return: formatted string which is supposed to be inserted into overlay."
      str
      "\n" border "\n")))
 
-(defun peek-overlay--set-content (ol str)
+(defun peek-overlay--set-content (ol str &optional borderlen)
   "Set the content for OL.
 OL: overlay.
 STR: original content string. It will be formatted using `peek-overlay--format-content' method before
@@ -180,7 +183,7 @@ being inserted into OL."
   (let ((display (if (overlay-get ol 'active) 
                      nil
                    ""))
-        (content (peek-overlay--format-content str)))
+        (content (peek-overlay--format-content str borderlen)))
     (overlay-put ol 'after-string
                  (propertize content 'display display))))
 
@@ -291,7 +294,10 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
     (unless ol
       (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
     (unless (overlay-get ol 'active) ;; set content before shown
-      (peek-overlay--set-content ol (peek--xref-get-definition-content)))
+      ;; it seems like during the following operation, olivetti doesn't instantly work, do we
+      ;; need to lock window-body-width before
+      (let ((window-body-width (window-body-width)))
+        (peek-overlay--set-content ol (peek--xref-get-definition-content) window-body-width)))
     (peek-overlay--toggle-active ol)
     (peek-display--overlay-update)))
 
