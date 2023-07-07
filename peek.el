@@ -67,7 +67,7 @@ NOTE: currently only support 'overlay'"
 It should be hooked at `window-state-change-hook'."
   (while-let ((windows (hash-table-keys peek-window-overlay-map)))
     (when-let ((window (pop windows))
-               ((window-live-p window)))
+               ((not (window-live-p window))))
       (peek-delete-window-overlay window))))
 
 (defun peek-get-window-overlay (&optional window)
@@ -79,7 +79,7 @@ Return nil if there is no overlay in the window"
              (get-buffer-window))))
     (gethash w peek-window-overlay-map)))
 
-(defun peek-delete-window-overlay (&optional WINDOW)
+(defun peek-delete-window-overlay (&optional window)
   "Delete the overlay inside WINDOW.
 If WINDOW is nil, then delete the overlay inside the current window."
   (let ((w (if (windowp window) ;; no matter live or not
@@ -161,6 +161,13 @@ Please ensure `after-string' property of OL isn't nil, otherwise this function d
       (peek-overlay--set-active ol nil)
     (peek-overlay--set-active ol t)))
 
+(defun peek-delete-all ()
+  (interactive)
+  "Delete all peek windows."
+  (while-let ((windows (hash-table-keys peek-window-overlay-map)))
+    (let ((window (pop windows)))
+      (peek-delete-window-overlay window))))
+
 (defun peek-overlay-dwim ()
   "Peek overlay do what I mean.
 If there is an active region, then store the region into the overlay in the current window;
@@ -170,7 +177,9 @@ Else toggle the display of the overlay."
     (unless ol
       (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
     (if (use-region-p)
-        (peek-overlay--set-content ol (peek--get-active-region-text))
+        (progn
+          (peek-overlay--set-content ol (peek--get-active-region-text))
+          (message "region stored"))
       (peek-overlay--toggle-active ol))
     (peek-display--overlay-update)))
 
@@ -178,7 +187,7 @@ Else toggle the display of the overlay."
   "Update the overlay position in the current window if overlay is active."
   (when-let ((ol (peek-get-window-overlay))
              ((overlay-get ol 'active)) ;; only update when overlay is active/visible
-             (pos (peek-overlay--get-supposed-position))) 
+             (pos (peek-overlay--get-supposed-position)))
     (move-overlay ol pos pos)))
 
 (defun peek-overlay--get-supposed-position ()
@@ -190,16 +199,18 @@ Return position."
       (below (forward-line (1+ peek-overlay-distance))))
     (point)))
 
-(define-minor-mode peek-mode
+(define-minor-mode global-peek-mode
   "Gloabl peek mode."
   :global t
   :lighter "peek"
   (cond
-   (peek-mode
-    (add-hook 'window-state-change-hook peek-clean-dead-overlays))
+   (global-peek-mode
+    (peek-delete-all)
+    (add-hook 'post-command-hook 'peek-display--overlay-update)
+    (add-hook 'window-state-change-hook 'peek-clean-dead-overlays))
    (t
-    ;; TODO
-    (remove-hook 'window-state-change-hook peek-clean-dead-overlays)
-    )))
+    (peek-delete-all)
+    (remove-hook 'post-command-hook 'peek-display--overlay-update)
+    (remove-hook 'window-state-change-hook 'peek-clean-dead-overlays))))
 
 (provide 'peek)
