@@ -75,7 +75,15 @@ NOTE: currently only support 'overlay'"
   ;;   (t
   ;;    :inherit font-lock-doc-face :foreground "#ecf0f1"))
   '((t (:inherit font-lock-doc-face)))
-  "Face used for borders of peek overlay window."
+  "Face for borders of peek overlay window."
+  :group 'peek)
+
+(defface peek-overlay-content-face
+  '((((background light))
+     :background "#ecf0f1" :extend t)
+    (t
+     :background "#95a5a6" :extend t))
+  "Additional face for content text of peek overlay window."
   :group 'peek)
 
 (defvar-local peek-window-overlay-map
@@ -156,6 +164,7 @@ Return: formatted string which is supposed to be inserted into overlay."
         (strlen (length str)))
     ;; `default' face is appended to make sure the display in overlay
     ;; is not affected by its surroundings.
+    (add-face-text-property 0 strlen 'peek-overlay-content-face 'append str)
     (add-face-text-property 0 strlen 'default 'append str)
     (concat
      "\n" border
