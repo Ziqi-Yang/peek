@@ -54,6 +54,21 @@ NOTE: currently only support 'overlay'"
   :type 'character
   :group 'peek)
 
+(defcustom peek-clean-dead-overlays-secs 3600
+  "Every the given seconds to perform `peek-clean-dead-overlays' function."
+  :type 'natnum
+  :group 'peek)
+
+(defcustom peek-xref-surrounding-above-lines 1
+  "Number of lines above the definition found by xref to be shown in the peek window."
+  :type 'natnum
+  :group 'peek)
+
+(defcustom peek-xref-surrounding-below-lines 15
+  "Number of lines below the definition found by xref to be shown in the peek window."
+  :type 'natnum
+  :group 'peek)
+
 (defface peek-overlay-border-face
   ;; '((((background light))
   ;;    :inherit font-lock-doc-face :foreground "#95a5a6")
@@ -65,15 +80,15 @@ NOTE: currently only support 'overlay'"
 
 (defvar peek-window-overlay-map
   (make-hash-table :test 'equal)
-  "Variable structure: { window: overlay }")
+  "This variable shouldn't be customized by user. Variable structure: { window: overlay }")
 
-(defun peek-clean-dead-overlays ()
+(defun peek-clean-dead-overlays (&rest _args)
   "This function clean those overlays existed in dead windows.
 It should be hooked at `window-state-change-hook'."
-  (while-let ((windows (hash-table-keys peek-window-overlay-map)))
-    (when-let ((window (pop windows))
-               ((not (window-live-p window))))
-      (peek-delete-window-overlay window))))
+  (let ((windows (hash-table-keys peek-window-overlay-map)))
+    (dolist (window windows)
+      (unless (window-live-p window)
+        (peek-delete-window-overlay window)))))
 
 (defun peek-get-window-overlay (&optional window)
   "Get the overlay inside WINDOW.
@@ -107,7 +122,9 @@ Return the newly created overlay."
   "Get text with properties in region.
 Return nil if region is not active."
   (when (use-region-p)
-    (buffer-substring (region-beginning) (region-end))))
+    (let ((text (buffer-substring (region-beginning) (region-end))))
+      (setq mark-active nil) ;; deactivate region mark
+      text)))
 
 (defun peek-overlay--format-make-border ()
   "Return the border string which is supposed to be used in overlay."
@@ -201,22 +218,6 @@ If WINDOW is nil, then show overlay in the current window."
   (let ((ol (peek-get-window-overlay window)))
     (peek-overlay--toggle-active ol)))
 
-;;;###autoload
-(defun peek-overlay-dwim ()
-  "Peek overlay do what I mean.
-If there is an active region, then store the region into the overlay in the current window;
-Else toggle the display of the overlay."
-  (interactive)
-  (let ((ol (peek-get-window-overlay)))
-    (unless ol
-      (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
-    (if (use-region-p)
-        (progn
-          (peek-overlay--set-content ol (peek--get-active-region-text))
-          (message "region stored"))
-      (peek-overlay--toggle-active ol))
-    (peek-display--overlay-update)))
-
 (defun peek-display--overlay-update ()
   "Update the overlay position in the current window if overlay is active."
   (when-let ((ol (peek-get-window-overlay))
@@ -234,6 +235,54 @@ Return position."
     (point)))
 
 ;;;###autoload
+(defun peek-overlay-dwim ()
+  "Peek overlay do what I mean.
+If there is an active region, then store the region into the overlay in the current window;
+Else toggle the display of the overlay."
+  (interactive)
+  (let ((ol (peek-get-window-overlay)))
+    (unless ol
+      (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
+    (if (use-region-p)
+        (progn
+          (peek-overlay--set-content ol (peek--get-active-region-text))
+          (message "region stored"))
+      (peek-overlay--toggle-active ol))
+    (peek-display--overlay-update)))
+
+(defun peek--xref-get-surrounding-text (above below)
+  "Get surrounding content around point from ABOVE lines above point to BELOW lines below point.
+Both ABOVE and BELOW need to be non-negative"
+  (save-excursion
+    (let (p1 p2)
+      (forward-line (- above))
+      (setq p1 (point))
+      (forward-line (+ above below))
+      (setq p2 (line-end-position))
+      (buffer-substring p1 p2))))
+
+(defun peek--xref-get-definition-content ()
+  "Get content for xref definition."
+  (save-excursion
+    (call-interactively 'xref-find-definitions)
+    (pop (car (xref--get-history))) ;; clear xref history
+    (peek--xref-get-surrounding-text
+     peek-xref-surrounding-above-lines peek-xref-surrounding-below-lines)))
+
+;;;###autoload
+(defun peek-xref-definition-dwim ()
+  "Peek xref definition (the same behavior as you call `xref-find-definitions').
+If the peek window is deactivated/invisible, then show peek window for xref definition, else hide the peek window."
+  (interactive)
+  (let ((ol (peek-get-window-overlay)))
+    (unless ol
+      (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
+    (unless (overlay-get ol 'active) ;; set content before shown
+      (peek-overlay--set-content ol (peek--xref-get-definition-content)))
+    (peek-overlay--toggle-active ol)
+    (peek-display--overlay-update)))
+
+;;;###autoload
 (define-minor-mode global-peek-mode
   "Gloabl peek mode."
   :global t
@@ -241,11 +290,12 @@ Return position."
   (cond
    (global-peek-mode
     (peek-delete-all)
-    (add-hook 'post-command-hook 'peek-display--overlay-update)
-    (add-hook 'window-state-change-hook 'peek-clean-dead-overlays))
+    (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
+    ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
+    (add-hook 'post-command-hook 'peek-display--overlay-update))
    (t
     (peek-delete-all)
-    (remove-hook 'post-command-hook 'peek-display--overlay-update)
-    (remove-hook 'window-state-change-hook 'peek-clean-dead-overlays))))
+    ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))
+    (remove-hook 'post-command-hook 'peek-display--overlay-update))))
 
 (provide 'peek)
