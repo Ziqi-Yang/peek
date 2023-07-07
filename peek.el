@@ -78,17 +78,28 @@ NOTE: currently only support 'overlay'"
   "Face used for borders of peek overlay window."
   :group 'peek)
 
-(defvar peek-window-overlay-map
-  (make-hash-table :test 'equal)
+(defvar-local peek-window-overlay-map
+    (make-hash-table :test 'equal)
   "This variable shouldn't be customized by user. Variable structure: { window: overlay }")
 
 (defun peek-clean-dead-overlays (&rest _args)
-  "This function clean those overlays existed in dead windows.
-It should be hooked at `window-state-change-hook'."
-  (let ((windows (hash-table-keys peek-window-overlay-map)))
-    (dolist (window windows)
-      (unless (window-live-p window)
-        (peek-delete-window-overlay window)))))
+  "This function clean those overlays existed in dead windows in all buffers."
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (let ((windows (hash-table-keys peek-window-overlay-map)))
+        (dolist (window windows)
+          (unless (window-live-p window)
+            (peek-delete-window-overlay window)))))))
+
+;;;###autoload
+(defun peek-clean-all-overlays ()
+  "Clean all overlays in all buffers."
+  (interactive)
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (let ((windows (hash-table-keys peek-window-overlay-map)))
+        (dolist (window windows)
+          (peek-delete-window-overlay window))))))
 
 (defun peek-get-window-overlay (&optional window)
   "Get the overlay inside WINDOW.
@@ -187,13 +198,6 @@ Please ensure `after-string' property of OL isn't nil, otherwise this function d
       (peek-overlay--set-active ol nil)
     (peek-overlay--set-active ol t)))
 
-(defun peek-delete-all ()
-  (interactive)
-  "Delete all peek windows."
-  (while-let ((windows (hash-table-keys peek-window-overlay-map)))
-    (let ((window (pop windows)))
-      (peek-delete-window-overlay window))))
-
 ;;;###autoload
 (defun peek-overlay-show (&optional window)
   "Provide API to show peek overlay.Only toggle overlay when it has content.
@@ -289,12 +293,12 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
   :lighter "peek"
   (cond
    (global-peek-mode
-    (peek-delete-all)
+    (peek-clean-all-overlays)
     (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
     ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
     (add-hook 'post-command-hook 'peek-display--overlay-update))
    (t
-    (peek-delete-all)
+    (peek-clean-all-overlays)
     ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))
     (remove-hook 'post-command-hook 'peek-display--overlay-update))))
 
