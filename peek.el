@@ -25,6 +25,18 @@
 
 ;;; Commentary:
 
+;; buffer local variable peek-window-overlay-map stores one overlay for every window
+
+;; custom properties for overlays:
+;;   1. active: nil or t, control whether the overlay is visible/invisible
+;;       you should never directly set the value for this property, use corresponding method instead
+;;   2. peek-type: indicate the current type of overlay
+;;       - 'string : marked region or eldoc message
+;;       - 'xref   : xref-find-definition
+;;   3. peek-lines: list of string, only stores strings for 'string type overlay
+;;   4. peek-last-xref: string, last searched identifier for 'xref type overlay
+;;   5. peek-offset: used for scrolling content inside peek window
+
 ;;; Code:
 
 (defgroup peek nil
@@ -59,15 +71,25 @@ NOTE: currently only support 'overlay'"
   :type 'natnum
   :group 'peek)
 
-(defcustom peek-xref-surrounding-above-lines 1
-  "Number of lines above the definition found by xref to be shown in the peek window."
+(defcustom peek-overlay-window-size 11
+  "Height of the peek overlay window. A value of 0 may cause undefined behavior."
   :type 'natnum
   :group 'peek)
 
-(defcustom peek-xref-surrounding-below-lines 10
-  "Number of lines below the definition found by xref to be shown in the peek window."
+(defcustom peek-xref-surrounding-above-lines 1
+  "Number of lines above the definition found by xref to be shown in the peek window. This value should be less than the `peek-overlay-window-size', otherwise undefined behavior."
   :type 'natnum
   :group 'peek)
+
+(defcustom peek-mode-keymap
+  (let ((map (make-sparse-keymap)))
+    ;; Browse file
+    (define-key map (kbd "M-n") 'peek-next-line)
+    (define-key map (kbd "M-p") 'peek-prev-line)
+    map)
+  "Keymap used for peek mode."
+  :type 'keymap
+  :group 'typst)
 
 (defface peek-overlay-border-face
   ;; '((((background light))
@@ -135,6 +157,10 @@ Return the newly created overlay."
              (ol (make-overlay pos pos)))
     (overlay-put ol 'window (get-buffer-window))
     (overlay-put ol 'active nil)
+    (overlay-put ol 'peek-type   'string)
+    (overlay-put ol 'peek-lines  '())
+    (overlay-put ol 'peek-offset 0)
+    (overlay-put ol 'peek-last-xref "")
     (puthash (get-buffer-window) ol peek-window-overlay-map)))
 
 (defun peek--get-active-region-text ()
@@ -145,11 +171,12 @@ Return nil if region is not active."
       (setq mark-active nil) ;; deactivate region mark
       text)))
 
-(defun peek-overlay--format-make-border (&optional borderlen)
-  "Return the border string which is supposed to be used in overlay."
+(defun peek-overlay--format-make-border (&optional wdw)
+  "Return the border string which is supposed to be used in overlay.
+WDW: window body width"
   ;; note that `display-line-numbers-mode' takes 2 + `line-number-display-width' columns
-  (let* ((window-body-width (if borderlen
-                                borderlen
+  (let* ((window-body-width (if wdw
+                                wdw
                               (window-body-width)))
          (total-column-number (1- window-body-width))) ;; terminal Emacs will pad '\' at the line end
     (when display-line-numbers-mode
@@ -159,11 +186,12 @@ Return nil if region is not active."
      (concat (make-string total-column-number peek-overlay-border-symbol) "\n")
      'face 'peek-overlay-border-face)))
 
-(defun peek-overlay--format-content (str &optional borderlen)
+(defun peek-overlay--format-content (str &optional wdw)
   "Format peek overlay content and return the formatted string.
 STR: the content string.
+WDW: window body width.
 Return: formatted string which is supposed to be inserted into overlay."
-  (let ((border (peek-overlay--format-make-border borderlen))
+  (let ((border (peek-overlay--format-make-border wdw))
         (strlen (length str)))
     ;; `default' face is appended to make sure the display in overlay
     ;; is not affected by its surroundings.
@@ -172,18 +200,22 @@ Return: formatted string which is supposed to be inserted into overlay."
     (concat
      "\n" border
      str
-     "\n" border "\n")))
+     (if (string-match "\n" (substring str (1- strlen) strlen))
+         ""
+       "\n")
+     border "\n")))
 
-(defun peek-overlay--set-content (ol str &optional borderlen)
+(defun peek-overlay--set-content (ol str &optional wdw)
   "Set the content for OL.
 OL: overlay.
 STR: original content string. It will be formatted using `peek-overlay--format-content' method before
-being inserted into OL."
+being inserted into OL.
+WDW: window body width."
   ;; set `after-string' property according to current `active' property
   (let ((display (if (overlay-get ol 'active) 
                      nil
                    ""))
-        (content (peek-overlay--format-content str borderlen)))
+        (content (peek-overlay--format-content str wdw)))
     (overlay-put ol 'after-string
                  (propertize content 'display display))))
 
@@ -250,55 +282,125 @@ Return position."
       (below (forward-line (1+ peek-overlay-distance))))
     (point)))
 
+(defun peek-get-or-create-window-overlay ()
+  "Get the current window's peek overlay. If there isn't one, the create it."
+  (let ((ol (peek-get-window-overlay)))
+    (unless ol
+      (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
+    ol))
+
+
 ;;;###autoload
-(defun peek-overlay-dwim ()
+(defun peek-overlay-marked-region-dwim ()
   "Peek overlay do what I mean.
 If there is an active region, then store the region into the overlay in the current window;
 Else toggle the display of the overlay."
   (interactive)
-  (let ((ol (peek-get-window-overlay)))
-    (unless ol
-      (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
+  (unless global-peek-mode
+    (global-peek-mode 1))
+  (let ((ol (peek-get-or-create-window-overlay)))
+    (overlay-put ol 'peek-type 'string)
     (if (use-region-p)
         (progn
-          (peek-overlay--set-content ol (peek--get-active-region-text))
+          (overlay-put ol 'peek-lines
+                       (split-string (peek--get-active-region-text) "\n"))
+          (peek-overlay-auto-set-content ol)
           (message "region stored"))
       (peek-overlay--toggle-active ol))
     (peek-display--overlay-update)))
 
-(defun peek--xref-get-surrounding-text (above below)
-  "Get surrounding content around point from ABOVE lines above point to BELOW lines below point.
+(defun peek--xref-get-surrounding-text (above)
+  "Get surrounding content around point from ABOVE lines above point with `peek-overlay-window-size' height.
 Both ABOVE and BELOW need to be non-negative"
   (save-excursion
     (let (p1 p2)
       (forward-line (- above))
       (setq p1 (point))
-      (forward-line (+ above below))
+      (forward-line (+ above peek-overlay-window-size))
       (setq p2 (line-end-position))
       (buffer-substring p1 p2))))
 
-(defun peek--xref-get-definition-content ()
-  "Get content for xref definition."
+(defun peek-overlay-get-content--xref (ol &optional xuli)
+  "Get content for xref definition.
+OL: overlay.
+XULI: xref use last identifier, boolean type"
   (save-excursion
-    (let ((xref-prompt-for-identifier nil)) ;; don't prompt, just use identifier at point
-      (call-interactively 'xref-find-definitions))
+    (unless xuli
+      (overlay-put ol 'peek-last-xref (thing-at-point 'symbol)))
+    (xref-find-definitions (overlay-get ol 'peek-last-xref))
     (pop (car (xref--get-history))) ;; clear xref history
-    (peek--xref-get-surrounding-text
-     peek-xref-surrounding-above-lines peek-xref-surrounding-below-lines)))
+    (forward-line (overlay-get ol 'peek-offset))
+    (peek--xref-get-surrounding-text peek-xref-surrounding-above-lines)))
+
+(defun peek-overlay-get-content--string (ol)
+  (let* ((lines (overlay-get ol 'peek-lines))
+         (lines-len (length lines))
+         (offset (min (1- lines-len) (overlay-get ol 'peek-offset)))
+         (bound-max (min (+ offset peek-overlay-window-size) lines-len)))
+    (string-join (cl-subseq lines offset bound-max) "\n")))
+
+(defun peek-overlay-auto-set-content (ol &optional xuli)
+  "Automatically set content for OL.
+OL: overlay.
+WDW: window body width.
+XULI: xref use last identifier."
+  (let ((peek-type (overlay-get ol 'peek-type)))
+    (cond
+     ((eq peek-type 'string)
+      (peek-overlay--set-content ol (peek-overlay-get-content--string ol)))
+     ((eq peek-type 'xref)
+      ;; it seems like during the following operation, olivetti doesn't work immediately, do we
+      ;; need to lock window-body-width before
+      (let ((window-body-width (window-body-width)))
+        (peek-overlay--set-content ol (peek-overlay-get-content--xref ol xuli) window-body-width)))
+     (t
+      (error "Invalid peek-type!")))))
+
+;;;###autoload
+(defun peek-next-line ()
+  "Scroll down current peek window 1 line. Only works when overlay is active/visible."
+  (interactive)
+  (when-let ((ol (peek-get-or-create-window-overlay))
+             ((overlay-get ol 'active))
+             (peek-type (overlay-get ol 'peek-type))
+             (offset (overlay-get ol 'peek-offset))
+             (bound-max (cond
+                         ((eq peek-type 'string)
+                          (length (overlay-get ol 'peek-lines)))
+                         ((eq peek-type 'xref)
+                          1.0e+INF) ;; infinity
+                         (e
+                          (error "Invalid peek-type!")))))
+    (overlay-put ol 'peek-offset (min (1+ offset) bound-max))
+    (peek-overlay-auto-set-content ol (eq peek-type 'xref))))
+
+;;;###autoload
+(defun peek-prev-line ()
+  "Scroll up current peek window 1 line. Only works when overlay is active/visible."
+  (interactive)
+  (when-let ((ol (peek-get-or-create-window-overlay))
+             ((overlay-get ol 'active))
+             (peek-type (overlay-get ol 'peek-type))
+             (offset (overlay-get ol 'peek-offset))
+             (bound-min (cond
+                         ((or (eq peek-type 'string) (eq peek-type 'xref))
+                          0)
+                         (e
+                          (error "Invalid peek-type!")))))
+    (overlay-put ol 'peek-offset (max (1- offset) bound-min))
+    (peek-overlay-auto-set-content ol (eq peek-type 'xref))))
 
 ;;;###autoload
 (defun peek-xref-definition-dwim ()
   "Peek xref definition (the same behavior as you call `xref-find-definitions').
 If the peek window is deactivated/invisible, then show peek window for xref definition, else hide the peek window."
   (interactive)
-  (let ((ol (peek-get-window-overlay)))
-    (unless ol
-      (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
+  (unless global-peek-mode
+    (global-peek-mode 1))
+  (let ((ol (peek-get-or-create-window-overlay)))
+    (overlay-put ol 'peek-type 'xref)
     (unless (overlay-get ol 'active) ;; set content before shown
-      ;; it seems like during the following operation, olivetti doesn't instantly work, do we
-      ;; need to lock window-body-width before
-      (let ((window-body-width (window-body-width)))
-        (peek-overlay--set-content ol (peek--xref-get-definition-content) window-body-width)))
+      (peek-overlay-auto-set-content ol))
     (peek-overlay--toggle-active ol)
     (peek-display--overlay-update)))
 
@@ -307,6 +409,7 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
   "Gloabl peek mode."
   :global t
   :lighter "peek"
+  :keymap peek-mode-keymap
   (cond
    (global-peek-mode
     (peek-clean-all-overlays)

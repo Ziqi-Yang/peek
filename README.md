@@ -7,8 +7,8 @@
 ## References
 
 Overlay: 
-1. [inline-docs](https://repo.or.cz/inline-docs.git/blob/HEAD:/inline-docs.el)
-2. [citre](https://github.com/universal-ctags/citre/blob/master/citre-ui-peek.el)
+1. [citre](https://github.com/universal-ctags/citre/blob/master/citre-ui-peek.el) (huge thanks to)
+2. [inline-docs](https://repo.or.cz/inline-docs.git/blob/HEAD:/inline-docs.el)
 3. [quick-peek](https://github.com/cpitclaudel/quick-peek)
 4. [lsp-ui](https://github.com/emacs-lsp/lsp-ui/blob/master/lsp-ui-peek.el)
 
