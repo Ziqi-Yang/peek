@@ -38,15 +38,20 @@ NOTE: currently only support 'overlay'"
                  (const :tag "use child frame" frame))
   :group 'peek)
 
-(defcustom peek-overlay-position 'below
+(defcustom peek-overlay-position 'above
   "Specify whether the overlay should be laid above the point or below the point"
   :type '(choice (const :tag "above the point" above)
                  (const :tag "below the point" below))
   :group 'peek)
 
-(defcustom peek-overlay-distance 1
+(defcustom peek-overlay-distance 4
   "Number of the lines between the peek overlay window and the point. 0 means the current line."
   :type 'natnum
+  :group 'peek)
+
+(defcustom peek-overlay-border-symbol ?-
+  "Specify symbol for peek overlay window border"
+  :type 'character
   :group 'peek)
 
 (defface peek-overlay-border-face
@@ -112,17 +117,21 @@ Return nil if region is not active."
       (setq total-column-number
             (- total-column-number (+ 2 (line-number-display-width)))))
     (propertize
-     (concat (make-string total-column-number ?-) "\n")
+     (concat (make-string total-column-number peek-overlay-border-symbol) "\n")
      'face 'peek-overlay-border-face)))
 
 (defun peek-overlay--format-content (str)
   "Format peek overlay content and return the formatted string.
 STR: the content string.
 Return: formatted string which is supposed to be inserted into overlay."
-  (let ((border (peek-overlay--format-make-border)))
+  (let ((border (peek-overlay--format-make-border))
+        (strlen (length str)))
+    ;; `default' face is appended to make sure the display in overlay
+    ;; is not affected by its surroundings.
+    (add-face-text-property 0 strlen 'default 'append str)
     (concat
      "\n" border
-     str 
+     str
      "\n" border "\n")))
 
 (defun peek-overlay--set-content (ol str)
