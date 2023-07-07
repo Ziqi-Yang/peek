@@ -108,15 +108,22 @@ NOTE: currently only support 'overlay'"
   "Additional face for content text of peek overlay window."
   :group 'peek)
 
-(defvar-local peek-window-overlay-map
-    (make-hash-table :test 'equal)
+(defvar-local peek-window-overlay-map nil
+  ;; (make-hash-table :test 'equal) ;; we need to manually set hash table for each buffer, otherwise we always change its global value
   "This variable shouldn't be customized by user. Variable structure: { window: overlay }")
+
+(defun peek--ensure-window-overlay-map ()
+  "If the hash table for current buffer hasn't been initialized, then create it."
+  (unless peek-window-overlay-map
+    (setq-local peek-window-overlay-map (make-hash-table :test 'equal))))
 
 (defun peek-clean-dead-overlays (&rest _args)
   "This function clean those overlays existed in dead windows in all buffers."
+  (peek--ensure-window-overlay-map)
   (dolist (buffer (buffer-list))
     (with-current-buffer buffer
-      (let ((windows (hash-table-keys peek-window-overlay-map)))
+      (when-let (((hash-table-p peek-window-overlay-map))
+                 (windows (hash-table-keys peek-window-overlay-map)))
         (dolist (window windows)
           (unless (window-live-p window)
             (peek-delete-window-overlay window)))))))
@@ -125,9 +132,11 @@ NOTE: currently only support 'overlay'"
 (defun peek-clean-all-overlays ()
   "Clean all overlays in all buffers."
   (interactive)
+  (peek--ensure-window-overlay-map)
   (dolist (buffer (buffer-list))
     (with-current-buffer buffer
-      (let ((windows (hash-table-keys peek-window-overlay-map)))
+      (when-let (((hash-table-p peek-window-overlay-map))
+                 (windows (hash-table-keys peek-window-overlay-map)))
         (dolist (window windows)
           (peek-delete-window-overlay window))))))
 
@@ -135,6 +144,7 @@ NOTE: currently only support 'overlay'"
   "Get the overlay inside WINDOW.
 If WINDOW is nil, then get the overlay inside the current window.
 Return nil if there is no overlay in the window"
+  (peek--ensure-window-overlay-map)
   (let ((w (if (windowp window) ;; no matter live or not
                window
              (get-buffer-window))))
@@ -143,6 +153,7 @@ Return nil if there is no overlay in the window"
 (defun peek-delete-window-overlay (&optional window)
   "Delete the overlay inside WINDOW.
 If WINDOW is nil, then delete the overlay inside the current window."
+  (peek--ensure-window-overlay-map)
   (let ((w (if (windowp window) ;; no matter live or not
                window
              (get-buffer-window))))
@@ -153,6 +164,7 @@ If WINDOW is nil, then delete the overlay inside the current window."
   "Create overlay for currently window.
 By default, the custom 'active' property of the overlay is nil.
 Return the newly created overlay."
+  (peek--ensure-window-overlay-map)
   (when-let (((not (minibufferp))) ;; not in a mini-buffer
              (ol (make-overlay pos pos)))
     (overlay-put ol 'window (get-buffer-window))
@@ -412,6 +424,7 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
   :keymap peek-mode-keymap
   (cond
    (global-peek-mode
+    ;; (make-variable-buffer-local 'peek-window-overlay-map)
     (peek-clean-all-overlays)
     (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
     ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
