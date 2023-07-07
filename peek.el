@@ -280,7 +280,8 @@ Both ABOVE and BELOW need to be non-negative"
 (defun peek--xref-get-definition-content ()
   "Get content for xref definition."
   (save-excursion
-    (call-interactively 'xref-find-definitions)
+    (let ((xref-prompt-for-identifier nil)) ;; don't prompt, just use identifier at point
+      (call-interactively 'xref-find-definitions))
     (pop (car (xref--get-history))) ;; clear xref history
     (peek--xref-get-surrounding-text
      peek-xref-surrounding-above-lines peek-xref-surrounding-below-lines)))
