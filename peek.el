@@ -108,12 +108,12 @@ NOTE: currently only support 'overlay'"
   "Additional face for content text of peek overlay window."
   :group 'peek)
 
-(defcustom peek-enable-eldoc-message-integration t
+(defcustom peek-enable-eldoc-message-integration nil
   "Show eldoc message on a peek window. Related function: `eldoc-message-function'. (Normally, before enabling, eldoc message: echo area; after enabling, eldoc message: peek window.)"
   :type 'boolean
   :group 'peek)
 
-(defcustom peek-enable-eldoc-display-integration t
+(defcustom peek-enable-eldoc-display-integration nil
   "Show eldoc docs inside a peek window. Related function: `eldoc-display-functions'."
   :type 'boolean
   :group 'peek)
