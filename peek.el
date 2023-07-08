@@ -256,7 +256,7 @@ Please ensure `after-string' property of OL isn't nil, otherwise this function d
 
 ;;;###autoload
 (defun peek-overlay-show (&optional window)
-  "Provide API to show peek overlay.Only toggle overlay when it has content.
+  "Provide an API to show peek overlay.Only toggle overlay when it has content.
 If WINDOW is nil, then show overlay in the current window."
   (interactive)
   (let ((ol (peek-get-window-overlay window)))
@@ -264,7 +264,7 @@ If WINDOW is nil, then show overlay in the current window."
 
 ;;;###autoload
 (defun peek-overlay-hide (&optional window)
-  "Provide API to show peek overlay. Only toggle overlay when it has content.
+  "Provide an API to show peek overlay. Only toggle overlay when it has content.
 If WINDOW is nil, then show overlay in the current window."
   (interactive)
   (let ((ol (peek-get-window-overlay window)))
@@ -272,11 +272,24 @@ If WINDOW is nil, then show overlay in the current window."
 
 ;;;###autoload
 (defun peek-overlay-toggle (&optional window)
-  "Provide API to toggle peek overlay. Only toggle overlay when it has content.
+  "Provide an API to toggle peek overlay. Only toggle overlay when it has content.
 If WINDOW is nil, then show overlay in the current window."
   (interactive)
   (let ((ol (peek-get-window-overlay window)))
     (peek-overlay--toggle-active ol)))
+
+;;;###autoload
+(defun peek-overlay-set-custom-content (str &optional window)
+  "Provide an API to show set custom content for peek overlay window in current buffer.
+STR: content string.
+You can pass STR with properties(like face) to show change the display of the content.
+The STR will be splitted into lines so the peek window can be scrolled."
+  (unless global-peek-mode
+    (global-peek-mode 1))
+  (let ((ol (peek-get-or-create-window-overlay window)))
+    (overlay-put ol 'peek-type 'string)
+    (overlay-put ol 'peek-lines (split-string str "\n"))
+    (peek-overlay-auto-set-content ol)))
 
 (defun peek-display--overlay-update ()
   "Update the overlay position in the current window if overlay is active."
@@ -294,9 +307,9 @@ Return position."
       (below (forward-line (1+ peek-overlay-distance))))
     (point)))
 
-(defun peek-get-or-create-window-overlay ()
-  "Get the current window's peek overlay. If there isn't one, the create it."
-  (let ((ol (peek-get-window-overlay)))
+(defun peek-get-or-create-window-overlay (&optional window)
+  "Get the the given(or current if not given) window's peek overlay. If there isn't one, the create it."
+  (let ((ol (peek-get-window-overlay window)))
     (unless ol
       (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
     ol))
