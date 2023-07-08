@@ -225,7 +225,9 @@ WDW: window body width"
   (let* ((window-body-width (if wdw
                                 wdw
                               (window-body-width)))
-         (total-column-number (1- window-body-width))) ;; terminal Emacs will pad '\' at the line end
+         (total-column-number (if (display-graphic-p)
+                                  window-body-width
+                                (1- window-body-width)))) ;; terminal Emacs will pad '\' at the line end
     (when display-line-numbers-mode
       (setq total-column-number
             (- total-column-number (+ 2 (line-number-display-width)))))
@@ -365,6 +367,7 @@ Return position."
         peek-eldoc-previous-message-function eldoc-message-function
         eldoc-message-function 'peek-overlay-eldoc-message-function))
 
+;;;###autoload
 (defun peek-overlay-eldoc-message-disable ()
   "Disable peek eldoc message overlay"
   (interactive)

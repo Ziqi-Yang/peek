@@ -6,7 +6,7 @@
 
 ## Features
 1. Peek window follows your cursor.
-2. Different peek window for different buffer and window.
+2. Buffer and window local peek windows. Also capable for content sharing between different buffer and windows.
 3. Store text of marked region, and then display it on the peek window.
 4. Peek the destination of `xref-find-definitions`.
 5. `eldoc-message-function` and `eldoc-display-functions` integration.
@@ -20,8 +20,19 @@ All features enabled version:
 ### Example
 
 ``` emacs-lisp
-
 ```
+
+### All Customization Variables
+
+Go to `customize` -> `peek`
+
+### Additional API
+These API may be useful for advanced customization:
+
+- `eldoc-message-function` related API: `peek-overlay-eldoc-message-toggle-stauts`, `peek-overlay-eldoc-message-disable`, `peek-overlay-eldoc-message-enable`. Possible customization direction: for model editing mode like `evil`, you can use these function to only enable displaying eldoc message overlay(peek window) when in _insert_ mode.
+
+- `peek-overlay-set-custom-content`, `peek-overlay-toggle`, `peek-overlay-hide`, `peek-overlay-show`
+
 
 ## Future Plan
 1. Support `Child frame`. (Currently `Peek` only support `overlay`.)
