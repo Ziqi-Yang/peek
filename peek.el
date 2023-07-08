@@ -125,7 +125,10 @@ NOTE: currently only support 'overlay'"
   "Special overlay for handling eldoc message.
 Customize `peek-enable-eldoc-message-integration' to enable/disable this feature")
 
-(defvar-local peek-eldoc-previous-message-function nil
+(defvar peek-eldoc-message-status nil
+  "The value of this variable shouldn't manually edited. Whether peek eldoc message is in enabled status.")
+
+(defvar peek-eldoc-previous-message-function nil
   "Previous `eldoc-message-function' before enabling `peek-enable-eldoc-message-integration'.
 Note you are supposed not to manually change `eldoc-message-function' between enabling and disabling the `global-peek-mode'.")
 
@@ -343,6 +346,31 @@ Return position."
     (peek-overlay--set-active peek-eldoc-message-overlay nil)))
 
 ;;;###autoload
+(defun peek-overlay-eldoc-message-enable ()
+  "Show peek eldoc message overlay"
+  (interactive)
+  (add-hook 'post-command-hook 'peek-overlay-eldoc-message-hide)
+  (setq peek-eldoc-message-status t
+        peek-eldoc-previous-message-function eldoc-message-function
+        eldoc-message-function 'peek-overlay-eldoc-message-function))
+
+(defun peek-overlay-eldoc-message-disable ()
+  "Disable peek eldoc message overlay"
+  (interactive)
+  (peek-overlay-eldoc-message-hide)
+  (remove-hook 'post-command-hook 'peek-overlay-eldoc-message-hide)
+  (setq peek-eldoc-message-status nil
+        eldoc-message-function peek-eldoc-previous-message-function))
+
+;;;###autoload
+(defun peek-overlay-eldoc-message-toggle-stauts ()
+  "Toggle (enable/disable) peek eldoc message overlay."
+  (interactive)
+  (if peek-eldoc-message-status
+      (peek-overlay-eldoc-message-disable)
+    (peek-overlay-eldoc-message-enable)))
+
+;;;###autoload
 (defun peek-overlay-eldoc-message-function (format-string &rest args)
   "Display peek overlay window FORMAT-STRING under point with extra ARGS."
   (when-let ((format-string)
@@ -492,17 +520,14 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
   (cond
    (global-peek-mode
     (when peek-enable-eldoc-message-integration
-      (add-hook 'post-command-hook 'peek-overlay-eldoc-message-hide)
-      (setq peek-eldoc-previous-message-function eldoc-message-function
-            eldoc-message-function 'peek-overlay-eldoc-message-function))
+      (peek-overlay-eldoc-message-enable))
     (peek-clean-all-overlays)
     (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
     ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
     (add-hook 'post-command-hook 'peek-display--overlay-update))
    (t
     (when peek-enable-eldoc-message-integration
-      (remove-hook 'post-command-hook 'peek-overlay-eldoc-message-hide)
-      (setq eldoc-message-function peek-eldoc-previous-message-function))
+      (peek-overlay-eldoc-message-disable))
     (peek-clean-all-overlays)
     ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))
     (remove-hook 'post-command-hook 'peek-display--overlay-update))))
