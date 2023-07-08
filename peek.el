@@ -57,7 +57,7 @@ NOTE: currently only support 'overlay'"
   :group 'peek)
 
 (defcustom peek-overlay-distance 4
-  "Number of the lines between the peek overlay window and the point. 0 means the current line."
+  "Number of the lines between the peek overlay window and the point. 0 means directly above/below the current line."
   :type 'natnum
   :group 'peek)
 
@@ -107,6 +107,27 @@ NOTE: currently only support 'overlay'"
      :background "#95a5a6" :extend t))
   "Additional face for content text of peek overlay window."
   :group 'peek)
+
+(defcustom peek-enable-eldoc-message-integration t
+  "TODO"
+  :type 'boolean
+  :group 'peek)
+
+(defcustom peek-eldoc-message-overlay-position 2
+  "Number of the lines between the peek eldoc message overlay window and the point.
+0 means directly above the current line.
+< 0 means above the current line;
+> 0 means below the current line."
+  :type 'integer
+  :group 'peek)
+
+(defvar-local peek-eldoc-message-overlay nil
+  "Special overlay for handling eldoc message.
+Customize `peek-enable-eldoc-message-integration' to enable/disable this feature")
+
+(defvar-local peek-eldoc-previous-message-function nil
+  "Previous `eldoc-message-function' before enabling `peek-enable-eldoc-message-integration'.
+Note you are supposed not to manually change `eldoc-message-function' between enabling and disabling the `global-peek-mode'.")
 
 (defvar-local peek-window-overlay-map nil
   ;; (make-hash-table :test 'equal) ;; we need to manually set hash table for each buffer, otherwise we always change its global value
@@ -314,6 +335,38 @@ Return position."
       (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
     ol))
 
+;;;###autoload
+(defun peek-overlay-eldoc-message-hide ()
+  "Hide peek eldoc message overlay."
+  (when peek-eldoc-message-overlay
+    (peek-overlay--set-active peek-eldoc-message-overlay nil)))
+
+;;;###autoload
+(defun peek-overlay-eldoc-message-function (format-string &rest args)
+  "Display peek overlay window FORMAT-STRING under point with extra ARGS."
+  (when-let ((format-string)
+             (ol (if peek-eldoc-message-overlay
+                     peek-eldoc-message-overlay
+                   (let ((ol (make-overlay 1 1)))
+                     (overlay-put ol 'window (get-buffer-window))
+                     (overlay-put ol 'active nil)
+                     (overlay-put ol 'peek-type   'string)
+                     (overlay-put ol 'peek-lines  '())
+                     (overlay-put ol 'peek-offset 0)
+                     (overlay-put ol 'peek-last-xref "")
+                     (setq peek-eldoc-message-overlay ol))))
+             (pos (peek-overlay-eldoc-message--get-supposed-position)))
+    (move-overlay ol pos pos)
+    (peek-overlay--set-active ol t)
+    (overlay-put ol 'peek-lines (split-string (apply #'format-message format-string args) "\n"))
+    (peek-overlay-auto-set-content ol)))
+
+(defun peek-overlay-eldoc-message--get-supposed-position ()
+  "Get the supposed position of the overlay in current window based `peek-overlay-position' and `peek-overlay-distance'.
+Return position."
+  (save-excursion
+    (forward-line peek-eldoc-message-overlay-position)
+    (point)))
 
 ;;;###autoload
 (defun peek-overlay-marked-region-dwim ()
@@ -437,12 +490,18 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
   :keymap peek-mode-keymap
   (cond
    (global-peek-mode
-    ;; (make-variable-buffer-local 'peek-window-overlay-map)
+    (when peek-enable-eldoc-message-integration
+      (add-hook 'post-command-hook 'peek-overlay-eldoc-message-hide)
+      (setq peek-eldoc-previous-message-function eldoc-message-function
+            eldoc-message-function 'peek-overlay-eldoc-message-function))
     (peek-clean-all-overlays)
     (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
     ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
     (add-hook 'post-command-hook 'peek-display--overlay-update))
    (t
+    (when peek-enable-eldoc-message-integration
+      (remove-hook 'post-command-hook 'peek-overlay-eldoc-message-hide)
+      (setq eldoc-message-function peek-eldoc-previous-message-function))
     (peek-clean-all-overlays)
     ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))
     (remove-hook 'post-command-hook 'peek-display--overlay-update))))
