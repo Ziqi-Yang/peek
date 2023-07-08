@@ -109,7 +109,12 @@ NOTE: currently only support 'overlay'"
   :group 'peek)
 
 (defcustom peek-enable-eldoc-message-integration t
-  "TODO"
+  "Show eldoc message on a peek window. Related function: `eldoc-message-function'. (Normally, before enabling, eldoc message: echo area; after enabling, eldoc message: peek window.)"
+  :type 'boolean
+  :group 'peek)
+
+(defcustom peek-enable-eldoc-display-integration t
+  "Show eldoc docs inside a peek window. Related function: `eldoc-display-functions'."
   :type 'boolean
   :group 'peek)
 
@@ -397,11 +402,27 @@ Return position."
     (forward-line peek-eldoc-message-overlay-position)
     (point)))
 
+(defun peek-display-eldoc (docs interactive)
+  "Related function: `eldoc-display-functions'. Only works when INTERACTIVE is t."
+  (when-let ((interactive)
+             (docs-content (with-current-buffer (eldoc--format-doc-buffer docs)
+                             (buffer-string)))
+             (ol (peek-get-or-create-window-overlay)))
+    (overlay-put ol 'peek-type 'string)
+    (overlay-put ol 'peek-lines
+                 (split-string docs-content "\n"))
+    (peek-overlay-auto-set-content ol)
+    (peek-overlay--set-active ol t)
+    (peek-display--overlay-update)))
+
 ;;;###autoload
-(defun peek-overlay-marked-region-dwim ()
+(defun peek-overlay-dwim ()
   "Peek overlay do what I mean.
 If there is an active region, then store the region into the overlay in the current window;
-Else toggle the display of the overlay."
+Else toggle the display of the overlay.
+Related features:
+  - store marked region, hide/show peek window
+  - hide eldoc display.(and is able to show eldoc display again if things not change)."
   (interactive)
   (unless global-peek-mode
     (global-peek-mode 1))
@@ -519,8 +540,10 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
   :keymap peek-mode-keymap
   (cond
    (global-peek-mode
-    (when peek-enable-eldoc-message-integration
+    (when peek-enable-eldoc-message-integration ;; eldoc-message-function
       (peek-overlay-eldoc-message-enable))
+    (when peek-enable-eldoc-display-integration ;; eldoc-display-functions
+      (add-to-list 'eldoc-display-functions 'peek-display-eldoc))
     (peek-clean-all-overlays)
     (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
     ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
@@ -528,6 +551,9 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
    (t
     (when peek-enable-eldoc-message-integration
       (peek-overlay-eldoc-message-disable))
+    (when peek-enable-eldoc-display-integration
+      (setq eldoc-display-functions
+            (remove 'peek-display-eldoc 'eldoc-display-functions)))
     (peek-clean-all-overlays)
     ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))
     (remove-hook 'post-command-hook 'peek-display--overlay-update))))
