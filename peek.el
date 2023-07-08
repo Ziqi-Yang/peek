@@ -231,12 +231,12 @@ Return: formatted string which is supposed to be inserted into overlay."
     (add-face-text-property 0 strlen 'peek-overlay-content-face 'append str)
     (add-face-text-property 0 strlen 'default 'append str)
     (concat
-     "\n" border
+     border
      str
      (if (string-match "\n" (substring str (1- strlen) strlen))
          ""
        "\n")
-     border "\n")))
+     border)))
 
 (defun peek-overlay--set-content (ol str &optional wdw)
   "Set the content for OL.
@@ -338,6 +338,7 @@ Return position."
 ;;;###autoload
 (defun peek-overlay-eldoc-message-hide ()
   "Hide peek eldoc message overlay."
+  (interactive)
   (when peek-eldoc-message-overlay
     (peek-overlay--set-active peek-eldoc-message-overlay nil)))
 
