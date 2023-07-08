@@ -452,13 +452,14 @@ Both ABOVE and BELOW need to be non-negative"
   "Get content for xref definition.
 OL: overlay.
 XULI: xref use last identifier, boolean type"
-  (save-excursion
-    (unless xuli
-      (overlay-put ol 'peek-last-xref (thing-at-point 'symbol)))
-    (xref-find-definitions (overlay-get ol 'peek-last-xref))
-    (pop (car (xref--get-history))) ;; clear xref history
-    (forward-line (overlay-get ol 'peek-offset))
-    (peek--xref-get-surrounding-text peek-xref-surrounding-above-lines)))
+  (unless xuli
+    (overlay-put ol 'peek-last-xref (thing-at-point 'symbol)))
+  (xref-find-definitions (overlay-get ol 'peek-last-xref))
+  (forward-line (overlay-get ol 'peek-offset))
+  (let ((content (peek--xref-get-surrounding-text peek-xref-surrounding-above-lines)))
+    (xref-pop-marker-stack) ;; obsolete funtion in emacs "29.1"
+    ;; (pop (car (xref--get-history))) ;; clear xref history
+    content))
 
 (defun peek-overlay-get-content--string (ol)
   (let* ((lines (overlay-get ol 'peek-lines))
