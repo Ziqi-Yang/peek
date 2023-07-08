@@ -378,7 +378,7 @@ XULI: xref use last identifier."
              (offset (overlay-get ol 'peek-offset))
              (bound-max (cond
                          ((eq peek-type 'string)
-                          (length (overlay-get ol 'peek-lines)))
+                          (1- (length (overlay-get ol 'peek-lines))))
                          ((eq peek-type 'xref)
                           1.0e+INF) ;; infinity
                          (e
