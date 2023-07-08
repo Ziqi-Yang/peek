@@ -141,6 +141,12 @@ Note you are supposed not to manually change `eldoc-message-function' between en
   ;; (make-hash-table :test 'equal) ;; we need to manually set hash table for each buffer, otherwise we always change its global value
   "This variable shouldn't be customized by user. Variable structure: { window: overlay }")
 
+(defvar peek-marked-region-text nil
+  "Store the last stored marked region text so that one marked region text can be stored into an peek overlay in a different buffer.")
+
+(defvar peek-marked-region-non-used nil
+  "Indicate that `peek-marked-region-text' hasn't been used. This variable is used to make sure that the right peek overlay show after storing a marked region can cross buffers. So later peek window toggles are still buffer-local")
+
 (defun peek--ensure-window-overlay-map ()
   "If the hash table for current buffer hasn't been initialized, then create it."
   (unless peek-window-overlay-map
@@ -421,7 +427,7 @@ Return position."
 If there is an active region, then store the region into the overlay in the current window;
 Else toggle the display of the overlay.
 Related features:
-  - store marked region, hide/show peek window
+  - store marked region, hide/show peek window.
   - hide eldoc display.(and is able to show eldoc display again if things not change)."
   (interactive)
   (unless global-peek-mode
@@ -430,11 +436,17 @@ Related features:
     (overlay-put ol 'peek-type 'string)
     (if (use-region-p)
         (progn
-          (overlay-put ol 'peek-lines
-                       (split-string (peek--get-active-region-text) "\n"))
-          (peek-overlay-auto-set-content ol)
+          (setq peek-marked-region-text (peek--get-active-region-text)
+                peek-marked-region-non-used t)
           (message "region stored"))
-      (peek-overlay--toggle-active ol))
+      (progn
+        (when (and (eq (overlay-get ol 'active) nil) ;; after toggle, overlay show
+                   (eq peek-marked-region-non-used t))
+          (overlay-put ol 'peek-lines
+                       (split-string peek-marked-region-text "\n"))
+          (peek-overlay-auto-set-content ol)
+          (setq peek-marked-region-non-used nil))
+        (peek-overlay--toggle-active ol)))
     (peek-display--overlay-update)))
 
 (defun peek--xref-get-surrounding-text (above)
