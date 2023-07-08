@@ -13,13 +13,79 @@
 6. Scroll up or down inside peek window. 
 
 ## Demo
-All features enabled version:
+
+## Usage
+
+- Store marked region and peek it later:
+   1. Mark a region
+   2. Use `peek-overlay-dwim` to store the region
+   3. Use `peek-overlay-dwim` again to show a peek window of the marked content. You can use this command in other buffer/window to show the marked content. 
+   4. Use `peek-overlay-dwim` to hidden the peek window.
+   
+- Find definition of a symbol.
+   1. Use `peek-xref-definition-dwim` to show the definition at the cursor point in peek window.
+   2. Use `peek-xref-definition-dwim` again to hide the peek window. You can also use `peek-overlay-dwim` to do this job.
+   
+- Display eldoc for the symbol under cursor.
+  1. Please refer to **Configuration** -> **Example** Section to enable the eldoc display function integration.
+  2. Use `eldoc` to diplay eldoc for the symbol under cursor.
+  3. Use `peek-overlay-dwim` to hide the peek window.
+  
+- Display eldoc message
+  Customize `peek-enable-eldoc-message-integration` to `t` to enable the eldoc message integration. You may also want to customize `peek-eldoc-message-overlay-position` too.   
+  Note: `peek-overlay-eldoc-message-toggle-stauts` function can be used to toggle whether the peek window for eldoc message will be shown.
+  
+- Scroll up/down in the peek window
+  - `M-n`: peek-next-line 
+  - `M-p`: peek-prev-line 
 
 ## Configuration
 
 ### Example
 
 ``` emacs-lisp
+(use-package peek
+  :straight (:type git :host sourcehut :repo "meow_king/peek")
+  ;; it seems like making keybindings for `peek-mode-keymap' here will
+  ;; make `global-peek-mode' not able to be automatically enabled in `config' section
+  ;; :bind
+  ;; ;; default bindings
+  ;; (:map peek-mode-keymap
+  ;;   ("M-n" . peek-next-line)
+  ;;   ("M-p" . peek-prev-line))
+
+  :custom
+  ;; only list some mostly-want-changed settings 
+  (peek-overlay-window-size 11) ;; lines
+  ;; one line before the place found by `xref-find-definitions' will also appear in peek window 
+  (peek-xref-surrounding-above-lines 1)
+  (peek-overlay-position 'above) ;; or below
+
+  (peek-enable-eldoc-message-integration t) ;; enable `eldoc-message-function' integration
+  ;; eldoc message overlay at two lines below the point
+  ;; It's recommended to set the eldoc message overlay below the point since the pop up of
+  ;; the peek overlay may cause visual shaking
+  (peek-eldoc-message-overlay-position 2)
+
+  (peek-enable-eldoc-display-integration t) ;; enable `eldoc-display-functons'  integration
+
+  :config
+  (global-peek-mode 1)
+
+  ;; Keybindings 
+  ;; `keymap-global-set' was introduced in emacs 29
+  (keymap-global-set "C-x P p" #'peek-overlay-dwim)
+  (keymap-global-set "C-x P d" #'peek-xref-definition-dwim)
+  (keymap-global-set "C-x P m" #'peek-overlay-eldoc-message-toggle-stauts)
+  (keymap-global-set "C-c c d" #'eldoc)
+
+  ;; ;; Eldoc display setting
+  ;; ;; Besides making `peek-enable-eldoc-display-integration' to t, you may want to remove
+  ;; ;;   other eldoc display functions.
+  ;; (setq eldoc-display-functions
+  ;;   (remove 'eldoc-display-in-buffer 'eldoc-display-functions))
+  ;; ;; Or simply set peek-display-eldoc as the only display function of eldoc-display-functions
+  (setq eldoc-display-functions '(peek-display-eldoc)))
 ```
 
 ### All Customization Variables
