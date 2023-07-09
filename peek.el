@@ -4,10 +4,10 @@
 
 ;; Version: 0.1.0
 ;; Author: Ziqi Yang <mr.meowking@anche.no>
-;; Keywords: typst languages tree-sitter
+;; Keywords: convenience, tools
 ;; URL: https://sr.ht/~meow_king/peek
 ;; License: GNU General Public License >= 3
-;; Package-Requires: ((emacs "27")) ;; NOTE haven't been tested
+;; Package-Requires: ((emacs "26.1"))
 
 ;; This file is NOT part of Emacs.
 ;; This program is free software: you can redistribute it and/or modify
@@ -44,25 +44,25 @@
   :group 'convenient)
 
 (defcustom peek-method 'overlay
-  "Preferred method to display peek window.
-NOTE: currently only support 'overlay'"
+  "Preferred method to display peek window."
   :type '(choice (const :tag "use overlay" overlay)
                  (const :tag "use child frame" frame))
   :group 'peek)
 
 (defcustom peek-overlay-position 'above
-  "Specify whether the overlay should be laid above the point or below the point"
+  "Specify whether the overlay should be laid above the point or below the point."
   :type '(choice (const :tag "above the point" above)
                  (const :tag "below the point" below))
   :group 'peek)
 
 (defcustom peek-overlay-distance 4
-  "Number of the lines between the peek overlay window and the point. 0 means directly above/below the current line."
+  "Number of the lines between the peek overlay window and the point.
+0 means directly above/below the current line."
   :type 'natnum
   :group 'peek)
 
 (defcustom peek-overlay-border-symbol ?-
-  "Specify symbol for peek overlay window border"
+  "Specify symbol for peek overlay window border."
   :type 'character
   :group 'peek)
 
@@ -72,12 +72,14 @@ NOTE: currently only support 'overlay'"
   :group 'peek)
 
 (defcustom peek-overlay-window-size 11
-  "Height of the peek overlay window. A value of 0 may cause undefined behavior."
+  "Height of the peek overlay window.  A value of 0 may cause undefined behavior."
   :type 'natnum
   :group 'peek)
 
 (defcustom peek-xref-surrounding-above-lines 1
-  "Number of lines above the definition found by xref to be shown in the peek window. This value should be less than the `peek-overlay-window-size', otherwise undefined behavior."
+  "Number of lines above the definition found by xref to be
+shown in the peek window. This value should be less than the
+`peek-overlay-window-size', otherwise undefined behavior."
   :type 'natnum
   :group 'peek)
 
@@ -109,12 +111,14 @@ NOTE: currently only support 'overlay'"
   :group 'peek)
 
 (defcustom peek-enable-eldoc-message-integration nil
-  "Show eldoc message on a peek window. Related function: `eldoc-message-function'. (Normally, before enabling, eldoc message: echo area; after enabling, eldoc message: peek window.)"
+  "Show eldoc message on a peek window.
+Related function: `eldoc-message-function'."
   :type 'boolean
   :group 'peek)
 
 (defcustom peek-enable-eldoc-display-integration nil
-  "Show eldoc docs inside a peek window. Related function: `eldoc-display-functions'."
+  "Show eldoc docs inside a peek window.
+Related function: `eldoc-display-functions'."
   :type 'boolean
   :group 'peek)
 
@@ -131,21 +135,30 @@ NOTE: currently only support 'overlay'"
 Customize `peek-enable-eldoc-message-integration' to enable/disable this feature")
 
 (defvar peek-eldoc-message-status nil
-  "The value of this variable shouldn't manually edited. Whether peek eldoc message is in enabled status.")
+  "The value of this variable shouldn't manually edited.
+Whether peek eldoc message is in enabled status.")
 
 (defvar peek-eldoc-previous-message-function nil
-  "Previous `eldoc-message-function' before enabling `peek-enable-eldoc-message-integration'.
-Note you are supposed not to manually change `eldoc-message-function' between enabling and disabling the `global-peek-mode'.")
+  "Previous `eldoc-message-function'.
+Previous `eldoc-message-function' before enabling
+`peek-enable-eldoc-message-integration'.  Note you are supposed not to
+manually change `eldoc-message-function' between enabling and disabling
+the `global-peek-mode'.")
 
 (defvar-local peek-window-overlay-map nil
   ;; (make-hash-table :test 'equal) ;; we need to manually set hash table for each buffer, otherwise we always change its global value
-  "This variable shouldn't be customized by user. Variable structure: { window: overlay }")
+  "This variable shouldn't be customized by user.
+Variable structure: { window: overlay }.")
 
 (defvar peek-marked-region-text nil
-  "Store the last stored marked region text so that one marked region text can be stored into an peek overlay in a different buffer.")
+  "Store the last stored marked region text so that one marked
+region text can be stored into an peek overlay in a different buffer.")
 
 (defvar peek-marked-region-non-used nil
-  "Indicate that `peek-marked-region-text' hasn't been used. This variable is used to make sure that the right peek overlay show after storing a marked region can cross buffers. So later peek window toggles are still buffer-local")
+  "Indicate that `peek-marked-region-text' hasn't been used.
+This variable is used to make sure that the right peek overlay show after
+storing a marked region can cross buffers.
+So later peek window toggles are still buffer-local.")
 
 (defun peek--ensure-window-overlay-map ()
   "If the hash table for current buffer hasn't been initialized, then create it."
@@ -195,9 +208,10 @@ If WINDOW is nil, then delete the overlay inside the current window."
     (delete-overlay (gethash w peek-window-overlay-map))
     (remhash w peek-window-overlay-map)))
 
-(defun peek-create-overlay (pos &optional active)
+(defun peek-create-overlay (pos)
   "Create overlay for currently window.
-By default, the custom 'active' property of the overlay is nil.
+POS: position of the overlay.
+By default, the custom _active_ property of the overlay is nil.
 Return the newly created overlay."
   (peek--ensure-window-overlay-map)
   (when-let (((not (minibufferp))) ;; not in a mini-buffer
@@ -257,11 +271,11 @@ Return: formatted string which is supposed to be inserted into overlay."
 (defun peek-overlay--set-content (ol str &optional wdw)
   "Set the content for OL.
 OL: overlay.
-STR: original content string. It will be formatted using `peek-overlay--format-content' method before
-being inserted into OL.
+STR: original content string.  It will be formatted using
+`peek-overlay--format-content' method before being inserted into OL.
 WDW: window body width."
   ;; set `after-string' property according to current `active' property
-  (let ((display (if (overlay-get ol 'active) 
+  (let ((display (if (overlay-get ol 'active)
                      nil
                    ""))
         (content (peek-overlay--format-content str wdw)))
@@ -272,7 +286,8 @@ WDW: window body width."
   "Set active/visibility of the given overlay.
 OL: overlay object
 ACTIVE: boolean type: t stands for visible, nil stands for invisible
-Please ensure `after-string' property of OL isn't nil, otherwise this function does nothing."
+Please ensure `after-string' property of OL isn't nil,
+otherwise this function does nothing."
   (when-let (((booleanp active)) ;; ensure `active' is nil or t
              (after-str (overlay-get ol 'after-string))) ;; ensure after-str isn't nil
     (if active
@@ -286,7 +301,8 @@ Please ensure `after-string' property of OL isn't nil, otherwise this function d
 (defun peek-overlay--toggle-active (ol)
   "Set active/visibility of the given overlay.
 OL: overlay object
-Please ensure `after-string' property of OL isn't nil, otherwise this function does nothing."
+Please ensure `after-string' property of OL isn't nil,
+otherwise this function does nothing."
   (if (overlay-get ol 'active)
       (peek-overlay--set-active ol nil)
     (peek-overlay--set-active ol t)))
@@ -301,7 +317,7 @@ If WINDOW is nil, then show overlay in the current window."
 
 ;;;###autoload
 (defun peek-overlay-hide (&optional window)
-  "Provide an API to show peek overlay. Only toggle overlay when it has content.
+  "Provide an API to show peek overlay.  Only toggle overlay when it has content.
 If WINDOW is nil, then show overlay in the current window."
   (interactive)
   (let ((ol (peek-get-window-overlay window)))
@@ -309,7 +325,7 @@ If WINDOW is nil, then show overlay in the current window."
 
 ;;;###autoload
 (defun peek-overlay-toggle (&optional window)
-  "Provide an API to toggle peek overlay. Only toggle overlay when it has content.
+  "Provide an API to toggle peek overlay.  Only toggle overlay when it has content.
 If WINDOW is nil, then show overlay in the current window."
   (interactive)
   (let ((ol (peek-get-window-overlay window)))
@@ -317,10 +333,13 @@ If WINDOW is nil, then show overlay in the current window."
 
 ;;;###autoload
 (defun peek-overlay-set-custom-content (str &optional window)
-  "Provide an API to show set custom content for peek overlay window in current buffer.
+  "Set custom content for the peek overlay window in current buffer.
 STR: content string.
-You can pass STR with properties(like face) to show change the display of the content.
-The STR will be splitted into lines so the peek window can be scrolled."
+WINDOW: the attached window object in current buffer.  If nil, the use
+current window.
+You can pass STR with properties(like face) to show change
+the display of the content.  The STR will be splitted into
+lines so the peek window can be scrolled."
   (unless global-peek-mode
     (global-peek-mode 1))
   (let ((ol (peek-get-or-create-window-overlay window)))
@@ -336,7 +355,8 @@ The STR will be splitted into lines so the peek window can be scrolled."
     (move-overlay ol pos pos)))
 
 (defun peek-overlay--get-supposed-position ()
-  "Get the supposed position of the overlay in current window based `peek-overlay-position' and `peek-overlay-distance'.
+  "Get the supposed position of a overlay.
+The calculation is based on `peek-overlay-position' and `peek-overlay-distance'.
 Return position."
   (save-excursion
     (cl-case peek-overlay-position
@@ -345,7 +365,10 @@ Return position."
     (point)))
 
 (defun peek-get-or-create-window-overlay (&optional window)
-  "Get the the given(or current if not given) window's peek overlay. If there isn't one, the create it."
+  "Get or create a overlay for WINDOW.
+If window is nil, the use current WINDOW.
+Get the the given(or current if not given) window's peek overlay.
+If there isn't one, the create it."
   (let ((ol (peek-get-window-overlay window)))
     (unless ol
       (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
@@ -360,19 +383,19 @@ Return position."
 
 ;;;###autoload
 (defun peek-overlay-eldoc-message-enable ()
-  "Show peek eldoc message overlay"
+  "Show peek eldoc message overlay."
   (interactive)
-  (add-hook 'post-command-hook 'peek-overlay-eldoc-message-hide)
+  (add-hook 'post-command-hook #'peek-overlay-eldoc-message-hide)
   (setq peek-eldoc-message-status t
         peek-eldoc-previous-message-function eldoc-message-function
         eldoc-message-function 'peek-overlay-eldoc-message-function))
 
 ;;;###autoload
 (defun peek-overlay-eldoc-message-disable ()
-  "Disable peek eldoc message overlay"
+  "Disable peek eldoc message overlay."
   (interactive)
   (peek-overlay-eldoc-message-hide)
-  (remove-hook 'post-command-hook 'peek-overlay-eldoc-message-hide)
+  (remove-hook 'post-command-hook #'peek-overlay-eldoc-message-hide)
   (setq peek-eldoc-message-status nil
         eldoc-message-function peek-eldoc-previous-message-function))
 
@@ -405,14 +428,18 @@ Return position."
     (peek-overlay-auto-set-content ol)))
 
 (defun peek-overlay-eldoc-message--get-supposed-position ()
-  "Get the supposed position of the overlay in current window based `peek-overlay-position' and `peek-overlay-distance'.
+  "Get supposed eldoc message overlay position.
+The calculation is based on `peek-eldoc-message-overlay-position' and
+the current point.
 Return position."
   (save-excursion
     (forward-line peek-eldoc-message-overlay-position)
     (point)))
 
 (defun peek-display-eldoc (docs interactive)
-  "Related function: `eldoc-display-functions'. Only works when INTERACTIVE is t."
+  "Related function: `eldoc-display-functions'.
+DOCS: docs passed by eldoc.
+Only works when INTERACTIVE is t."
   (when-let ((interactive)
              (docs-content (with-current-buffer (eldoc--format-doc-buffer docs)
                              (buffer-string)))
@@ -427,11 +454,13 @@ Return position."
 ;;;###autoload
 (defun peek-overlay-dwim ()
   "Peek overlay do what I mean.
-If there is an active region, then store the region into the overlay in the current window;
+If there is an active region, then store the region into the overlay
+in the current window;
 Else toggle the display of the overlay.
 Related features:
   - store marked region, hide/show peek window.
-  - hide eldoc display.(and is able to show eldoc display again if things not change)."
+  - hide eldoc display.(and is able to show eldoc display again if
+things not change)."
   (interactive)
   (unless global-peek-mode
     (global-peek-mode 1))
@@ -453,7 +482,9 @@ Related features:
     (peek-display--overlay-update)))
 
 (defun peek--xref-get-surrounding-text (above)
-  "Get surrounding content around point from ABOVE lines above point with `peek-overlay-window-size' height.
+  "Get surrounding content for xref definition.
+Get surrounding content around point from ABOVE lines above
+point with `peek-overlay-window-size' height.
 Both ABOVE and BELOW need to be non-negative"
   (save-excursion
     (let (p1 p2)
@@ -472,11 +503,14 @@ XULI: xref use last identifier, boolean type"
   (xref-find-definitions (overlay-get ol 'peek-last-xref))
   (forward-line (overlay-get ol 'peek-offset))
   (let ((content (peek--xref-get-surrounding-text peek-xref-surrounding-above-lines)))
-    (xref-pop-marker-stack) ;; obsolete funtion in emacs "29.1"
-    ;; (pop (car (xref--get-history))) ;; clear xref history
+    (if (and (>= emacs-major-version 29) (>= emacs-minor-version 1))
+        (xref-go-back)
+      (xref-pop-marker-stack))
     content))
 
 (defun peek-overlay-get-content--string (ol)
+  "Get content for overlay.  Peek-type: string.
+OL: overlay."
   (let* ((lines (overlay-get ol 'peek-lines))
          (lines-len (length lines))
          (offset (min (1- lines-len) (overlay-get ol 'peek-offset)))
@@ -502,7 +536,8 @@ XULI: xref use last identifier."
 
 ;;;###autoload
 (defun peek-next-line ()
-  "Scroll down current peek window 1 line. Only works when overlay is active/visible."
+  "Scroll down current peek window 1 line.
+Only works when overlay is active/visible."
   (interactive)
   (when-let ((ol (peek-get-or-create-window-overlay))
              ((overlay-get ol 'active))
@@ -513,14 +548,15 @@ XULI: xref use last identifier."
                           (1- (length (overlay-get ol 'peek-lines))))
                          ((eq peek-type 'xref)
                           1.0e+INF) ;; infinity
-                         (e
+                         (t
                           (error "Invalid peek-type!")))))
     (overlay-put ol 'peek-offset (min (1+ offset) bound-max))
     (peek-overlay-auto-set-content ol (eq peek-type 'xref))))
 
 ;;;###autoload
 (defun peek-prev-line ()
-  "Scroll up current peek window 1 line. Only works when overlay is active/visible."
+  "Scroll up current peek window 1 line.
+Only works when overlay is active/visible."
   (interactive)
   (when-let ((ol (peek-get-or-create-window-overlay))
              ((overlay-get ol 'active))
@@ -529,7 +565,7 @@ XULI: xref use last identifier."
              (bound-min (cond
                          ((or (eq peek-type 'string) (eq peek-type 'xref))
                           0)
-                         (e
+                         (t
                           (error "Invalid peek-type!")))))
     (overlay-put ol 'peek-offset (max (1- offset) bound-min))
     (peek-overlay-auto-set-content ol (eq peek-type 'xref))))
@@ -537,7 +573,8 @@ XULI: xref use last identifier."
 ;;;###autoload
 (defun peek-xref-definition-dwim ()
   "Peek xref definition (the same behavior as you call `xref-find-definitions').
-If the peek window is deactivated/invisible, then show peek window for xref definition, else hide the peek window."
+If the peek window is deactivated/invisible, then show peek window
+for xref definition, else hide the peek window."
   (interactive)
   (unless global-peek-mode
     (global-peek-mode 1))
@@ -559,18 +596,20 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
     (when peek-enable-eldoc-message-integration ;; eldoc-message-function
       (peek-overlay-eldoc-message-enable))
     (when peek-enable-eldoc-display-integration ;; eldoc-display-functions
-      (add-hook 'eldoc-display-functions 'peek-display-eldoc))
+      (add-hook 'eldoc-display-functions #'peek-display-eldoc))
     (peek-clean-all-overlays)
     (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
     ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
-    (add-hook 'post-command-hook 'peek-display--overlay-update))
+    (add-hook 'post-command-hook #'peek-display--overlay-update))
    (t
     (when peek-enable-eldoc-message-integration
       (peek-overlay-eldoc-message-disable))
     (when peek-enable-eldoc-display-integration
-      (remove-hook 'eldoc-display-functions 'peek-display-eldoc))
+      (remove-hook 'eldoc-display-functions #'peek-display-eldoc))
     (peek-clean-all-overlays)
     ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))
-    (remove-hook 'post-command-hook 'peek-display--overlay-update))))
+    (remove-hook 'post-command-hook #'peek-display--overlay-update))))
 
 (provide 'peek)
+
+;;; peek.el ends here
