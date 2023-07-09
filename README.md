@@ -12,6 +12,9 @@
 5. `eldoc-message-function` and `eldoc-display-functions` integration.
 6. Scroll up or down inside peek window. 
 
+TODO `eldoc-display-functions` may be a `hook-type`
+TODO cannot display eldoc message?
+
 ## Demo
 
 ## Usage

@@ -559,7 +559,7 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
     (when peek-enable-eldoc-message-integration ;; eldoc-message-function
       (peek-overlay-eldoc-message-enable))
     (when peek-enable-eldoc-display-integration ;; eldoc-display-functions
-      (add-to-list 'eldoc-display-functions 'peek-display-eldoc))
+      (add-hook 'eldoc-display-functions 'peek-display-eldoc))
     (peek-clean-all-overlays)
     (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
     ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
@@ -568,8 +568,7 @@ If the peek window is deactivated/invisible, then show peek window for xref defi
     (when peek-enable-eldoc-message-integration
       (peek-overlay-eldoc-message-disable))
     (when peek-enable-eldoc-display-integration
-      (setq eldoc-display-functions
-            (remove 'peek-display-eldoc 'eldoc-display-functions)))
+      (remove-hook 'eldoc-display-functions 'peek-display-eldoc))
     (peek-clean-all-overlays)
     ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))
     (remove-hook 'post-command-hook 'peek-display--overlay-update))))
