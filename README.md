@@ -55,13 +55,6 @@
 ``` emacs-lisp
 (use-package peek
   :straight (:type git :host sourcehut :repo "meow_king/peek")
-  ;; it seems like making keybindings for `peek-mode-keymap' here will
-  ;; make `global-peek-mode' not able to be automatically enabled in `config' section
-  ;; :bind
-  ;; ;; default bindings
-  ;; (:map peek-mode-keymap
-  ;;   ("M-n" . peek-next-line)
-  ;;   ("M-p" . peek-prev-line))
 
   :custom
   ;; only list some mostly-want-changed settings 
