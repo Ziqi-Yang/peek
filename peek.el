@@ -118,6 +118,7 @@ Related function: `eldoc-message-function'."
 
 (defcustom peek-enable-eldoc-display-integration nil
   "Show eldoc docs inside a peek window.
+Note you need Emacs version >= 28.1.
 Related function: `eldoc-display-functions'."
   :type 'boolean
   :group 'peek)
@@ -436,20 +437,22 @@ Return position."
     (forward-line peek-eldoc-message-overlay-position)
     (point)))
 
-(defun peek-display-eldoc (docs interactive)
-  "Related function: `eldoc-display-functions'.
+;;;###autoload
+(when (>= emacs-major-version 28)
+  (defun peek-display-eldoc (docs interactive)
+    "Related function: `eldoc-display-functions'.
 DOCS: docs passed by eldoc.
 Only works when INTERACTIVE is t."
-  (when-let ((interactive)
-             (docs-content (with-current-buffer (eldoc--format-doc-buffer docs)
-                             (buffer-string)))
-             (ol (peek-get-or-create-window-overlay)))
-    (overlay-put ol 'peek-type 'string)
-    (overlay-put ol 'peek-lines
-                 (split-string docs-content "\n"))
-    (peek-overlay-auto-set-content ol)
-    (peek-overlay--set-active ol t)
-    (peek-display--overlay-update)))
+    (when-let ((interactive)
+               (docs-content (with-current-buffer (eldoc--format-doc-buffer docs)
+                               (buffer-string)))
+               (ol (peek-get-or-create-window-overlay)))
+      (overlay-put ol 'peek-type 'string)
+      (overlay-put ol 'peek-lines
+                   (split-string docs-content "\n"))
+      (peek-overlay-auto-set-content ol)
+      (peek-overlay--set-active ol t)
+      (peek-display--overlay-update))))
 
 ;;;###autoload
 (defun peek-overlay-dwim ()
@@ -595,7 +598,8 @@ for xref definition, else hide the peek window."
    (global-peek-mode
     (when peek-enable-eldoc-message-integration ;; eldoc-message-function
       (peek-overlay-eldoc-message-enable))
-    (when peek-enable-eldoc-display-integration ;; eldoc-display-functions
+    (when (and (>= emacs-major-version 28)
+               peek-enable-eldoc-display-integration) ;; eldoc-display-functions
       (add-hook 'eldoc-display-functions #'peek-display-eldoc))
     (peek-clean-all-overlays)
     (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
@@ -604,7 +608,8 @@ for xref definition, else hide the peek window."
    (t
     (when peek-enable-eldoc-message-integration
       (peek-overlay-eldoc-message-disable))
-    (when peek-enable-eldoc-display-integration
+    (when (and (>= emacs-major-version 28)
+               peek-enable-eldoc-display-integration)
       (remove-hook 'eldoc-display-functions #'peek-display-eldoc))
     (peek-clean-all-overlays)
     ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))

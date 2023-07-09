@@ -29,6 +29,7 @@
    2. Use `peek-xref-definition-dwim` again to hide the peek window. You can also use `peek-overlay-dwim` to do this job.
    
 - Display eldoc for the symbol under cursor.
+  note: you need Emacs version >= 28.1  
   1. Customize `peek-enable-eldoc-display-integration' to t.
   2. You may also want to remove other eldoc display functions
   
@@ -75,7 +76,9 @@
   ;; the peek overlay may cause visual shaking
   (peek-eldoc-message-overlay-position 2)
 
-  (peek-enable-eldoc-display-integration t) ;; enable `eldoc-display-functons'  integration
+  ;; enable `eldoc-display-functons'  integration
+  ;; note: you need Emacs version >= 28.1
+  (peek-enable-eldoc-display-integration t)
 
   :config
   (global-peek-mode 1)
@@ -102,6 +105,7 @@
 Go to `customize` -> `peek`
 
 ### Additional API
+
 These API may be useful for advanced customization:
 
 - `eldoc-message-function` related API: `peek-overlay-eldoc-message-toggle-stauts`, `peek-overlay-eldoc-message-disable`, `peek-overlay-eldoc-message-enable`. Possible customization direction: for model editing mode like `evil`, you can use these function to only enable displaying eldoc message overlay(peek window) when in _insert_ mode.
@@ -110,6 +114,7 @@ These API may be useful for advanced customization:
 
 
 ## Future Plan
+
 1. Support `Child frame`. (Currently `Peek` only support `overlay`.)
 2. Pseudo `overlay` that behaves like floating on the upper layer of the text (like child frame, so we have better terminal support). Maybe I should take a look at the source code of `corfu` or `company`.
 
