@@ -77,8 +77,8 @@
   :group 'peek)
 
 (defcustom peek-xref-surrounding-above-lines 1
-  "Number of lines above the definition found by xref to be
-shown in the peek window. This value should be less than the
+  "Number of Lines above the xref definition to be shown in peek window.
+This value should be less than the
 `peek-overlay-window-size', otherwise undefined behavior."
   :type 'natnum
   :group 'peek)
@@ -152,8 +152,7 @@ the `global-peek-mode'.")
 Variable structure: { window: overlay }.")
 
 (defvar peek-marked-region-text nil
-  "Store the last stored marked region text so that one marked
-region text can be stored into an peek overlay in a different buffer.")
+  "Store the last stored marked region text.")
 
 (defvar peek-marked-region-non-used nil
   "Indicate that `peek-marked-region-text' hasn't been used.
