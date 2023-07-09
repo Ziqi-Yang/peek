@@ -506,7 +506,7 @@ XULI: xref use last identifier, boolean type"
   (xref-find-definitions (overlay-get ol 'peek-last-xref))
   (forward-line (overlay-get ol 'peek-offset))
   (let ((content (peek--xref-get-surrounding-text peek-xref-surrounding-above-lines)))
-    (if (and (>= emacs-major-version 29) (>= emacs-minor-version 1))
+    (if (>= emacs-major-version 29)
         (xref-go-back)
       (xref-pop-marker-stack))
     content))
