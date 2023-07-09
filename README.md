@@ -12,10 +12,9 @@
 5. `eldoc-message-function` and `eldoc-display-functions` integration.
 6. Scroll up or down inside peek window. 
 
-TODO `eldoc-display-functions` may be a `hook-type`
-TODO cannot display eldoc message?
-
 ## Demo
+
+[Demo](demo.md)
 
 ## Usage
 
@@ -30,9 +29,15 @@ TODO cannot display eldoc message?
    2. Use `peek-xref-definition-dwim` again to hide the peek window. You can also use `peek-overlay-dwim` to do this job.
    
 - Display eldoc for the symbol under cursor.
-  1. Please refer to **Configuration** -> **Example** Section to enable the eldoc display function integration.
-  2. Use `eldoc` to diplay eldoc for the symbol under cursor.
-  3. Use `peek-overlay-dwim` to hide the peek window.
+  1. Customize `peek-enable-eldoc-display-integration' to t.
+  2. You may also want to remove other eldoc display functions
+  
+  ```emacs-lisp
+  (remove-hook 'eldoc-display-functions 'eldoc-display-in-buffer)
+  ```
+  
+  3. Use `eldoc` to diplay eldoc for the symbol under cursor.
+  4. Use `peek-overlay-dwim` to hide the peek window.
   
 - Display eldoc message
   Customize `peek-enable-eldoc-message-integration` to `t` to enable the eldoc message integration. You may also want to customize `peek-eldoc-message-overlay-position` too.   
@@ -76,19 +81,20 @@ TODO cannot display eldoc message?
   (global-peek-mode 1)
 
   ;; Keybindings 
-  ;; `keymap-global-set' was introduced in emacs 29
-  (keymap-global-set "C-x P p" #'peek-overlay-dwim)
-  (keymap-global-set "C-x P d" #'peek-xref-definition-dwim)
-  (keymap-global-set "C-x P m" #'peek-overlay-eldoc-message-toggle-stauts)
-  (keymap-global-set "C-c c d" #'eldoc)
-
-  ;; ;; Eldoc display setting
-  ;; ;; Besides making `peek-enable-eldoc-display-integration' to t, you may want to remove
-  ;; ;;   other eldoc display functions.
-  ;; (setq eldoc-display-functions
-  ;;   (remove 'eldoc-display-in-buffer 'eldoc-display-functions))
-  ;; ;; Or simply set peek-display-eldoc as the only display function of eldoc-display-functions
-  (setq eldoc-display-functions '(peek-display-eldoc)))
+  ;; default keybindings in peek-mode-keymap
+  (define-key peek-mode-keymap (kbd "M-n") 'peek-next-line)
+  (define-key peek-mode-keymap (kbd "M-p") 'peek-prev-line)
+  
+  ;; or you can use `keymap-global-set', which is introduced in emacs 29
+  (global-set-key (kbd "C-x P p") #'peek-overlay-dwim)
+  (global-set-key (kbd "C-x P d") #'peek-xref-definition-dwim)
+  (global-set-key (kbd "C-x P m") #'peek-overlay-eldoc-message-toggle-stauts)
+  (global-set-key (kbd "C-c c d") #'eldoc)
+  
+  ;; Eldoc display setting
+  ;; Besides making `peek-enable-eldoc-display-integration' to t, you may want to remove
+  ;;   other eldoc display functions.
+  (remove-hook 'eldoc-display-functions 'eldoc-display-in-buffer))
 ```
 
 ### All Customization Variables
