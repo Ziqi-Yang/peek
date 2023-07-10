@@ -246,7 +246,11 @@ WDW: window body width"
                               (window-body-width)))
          (total-column-number (if (display-graphic-p)
                                   window-body-width
-                                (1- window-body-width))))  ; terminal Emacs will pad '\' at the line end
+                                ;; terminal Emacs will pad '\' at the line end
+                                (1- window-body-width))) 
+         ;; NOTE temporary solution for randomly exceeding 1 border character when
+         ;; use `peek-xref-definition-dwim' 
+         (total-column-number (1- total-column-number)))
     (when display-line-numbers-mode
       (setq total-column-number
             (- total-column-number (+ 2 (line-number-display-width)))))
