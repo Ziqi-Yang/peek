@@ -66,7 +66,7 @@
   :type 'natnum
   :group 'peek)
 
-(defcustom peek-overlay-border-symbol ?-
+(defcustom peek-overlay-border-symbol ?\N{BOX DRAWINGS LIGHT HORIZONTAL}
   "Specify symbol for peek overlay window border."
   :type 'character
   :group 'peek)
