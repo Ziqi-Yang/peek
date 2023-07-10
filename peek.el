@@ -29,7 +29,8 @@
 
 ;; custom properties for overlays:
 ;;   1. active: nil or t, control whether the overlay is visible/invisible
-;;       you should never directly set the value for this property, use corresponding method instead
+;;       you should never directly set the value for this property, use
+;;       corresponding method instead
 ;;   2. peek-type: indicate the current type of overlay
 ;;       - 'string : marked region or eldoc message
 ;;       - 'xref   : xref-find-definition
@@ -38,6 +39,8 @@
 ;;   5. peek-offset: used for scrolling content inside peek window
 
 ;;; Code:
+
+(require 'display-line-numbers)
 
 (defgroup peek nil
   "Peek mode."
@@ -331,22 +334,6 @@ If WINDOW is nil, then show overlay in the current window."
   (let ((ol (peek-get-window-overlay window)))
     (peek-overlay--toggle-active ol)))
 
-;;;###autoload
-(defun peek-overlay-set-custom-content (str &optional window)
-  "Set custom content for the peek overlay window in current buffer.
-STR: content string.
-WINDOW: the attached window object in current buffer.  If nil, the use
-current window.
-You can pass STR with properties(like face) to show change
-the display of the content.  The STR will be splitted into
-lines so the peek window can be scrolled."
-  (unless global-peek-mode
-    (global-peek-mode 1))
-  (let ((ol (peek-get-or-create-window-overlay window)))
-    (overlay-put ol 'peek-type 'string)
-    (overlay-put ol 'peek-lines (split-string str "\n"))
-    (peek-overlay-auto-set-content ol)))
-
 (defun peek-display--overlay-update ()
   "Update the overlay position in the current window if overlay is active."
   (when-let ((ol (peek-get-window-overlay))
@@ -453,36 +440,6 @@ Only works when INTERACTIVE is t."
       (peek-overlay--set-active ol t)
       (peek-display--overlay-update))))
 
-;;;###autoload
-(defun peek-overlay-dwim ()
-  "Peek overlay do what I mean.
-If there is an active region, then store the region into the overlay
-in the current window;
-Else toggle the display of the overlay.
-Related features:
-  - store marked region, hide/show peek window.
-  - hide eldoc display.(and is able to show eldoc display again if
-things not change)."
-  (interactive)
-  (unless global-peek-mode
-    (global-peek-mode 1))
-  (let ((ol (peek-get-or-create-window-overlay)))
-    (overlay-put ol 'peek-type 'string)
-    (if (use-region-p)
-        (progn
-          (setq peek-marked-region-text (peek--get-active-region-text)
-                peek-marked-region-non-used t)
-          (message "region stored"))
-      (progn
-        (when (and (eq (overlay-get ol 'active) nil) ;; after toggle, overlay show
-                   (eq peek-marked-region-non-used t))
-          (overlay-put ol 'peek-lines
-                       (split-string peek-marked-region-text "\n"))
-          (peek-overlay-auto-set-content ol)
-          (setq peek-marked-region-non-used nil))
-        (peek-overlay--toggle-active ol)))
-    (peek-display--overlay-update)))
-
 (defun peek--xref-get-surrounding-text (above)
   "Get surrounding content for xref definition.
 Get surrounding content around point from ABOVE lines above
@@ -573,6 +530,79 @@ Only works when overlay is active/visible."
     (peek-overlay-auto-set-content ol (eq peek-type 'xref))))
 
 ;;;###autoload
+(define-minor-mode global-peek-mode
+  "Gloabl peek mode."
+  :global t
+  :lighter " peek"
+  :keymap peek-mode-keymap
+  (cond
+   (global-peek-mode
+    (when peek-enable-eldoc-message-integration ;; eldoc-message-function
+      (peek-overlay-eldoc-message-enable))
+    (when (and (>= emacs-major-version 28)
+               peek-enable-eldoc-display-integration) ;; eldoc-display-functions
+      (add-hook 'eldoc-display-functions #'peek-display-eldoc))
+    (peek-clean-all-overlays)
+    (run-with-timer peek-clean-dead-overlays-secs t #'peek-clean-dead-overlays)
+    ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
+    (add-hook 'post-command-hook #'peek-display--overlay-update))
+   (t
+    (when peek-enable-eldoc-message-integration
+      (peek-overlay-eldoc-message-disable))
+    (when (and (>= emacs-major-version 28)
+               peek-enable-eldoc-display-integration)
+      (remove-hook 'eldoc-display-functions #'peek-display-eldoc))
+    (peek-clean-all-overlays)
+    ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))
+    (remove-hook 'post-command-hook #'peek-display--overlay-update))))
+
+;;;###autoload
+(defun peek-overlay-dwim ()
+  "Peek overlay do what I mean.
+If there is an active region, then store the region into the overlay
+in the current window;
+Else toggle the display of the overlay.
+Related features:
+  - store marked region, hide/show peek window.
+  - hide eldoc display.(and is able to show eldoc display again if
+things not change)."
+  (interactive)
+  (unless global-peek-mode
+    (global-peek-mode 1))
+  (let ((ol (peek-get-or-create-window-overlay)))
+    (overlay-put ol 'peek-type 'string)
+    (if (use-region-p)
+        (progn
+          (setq peek-marked-region-text (peek--get-active-region-text)
+                peek-marked-region-non-used t)
+          (message "region stored"))
+      (progn
+        (when (and (eq (overlay-get ol 'active) nil) ;; after toggle, overlay show
+                   (eq peek-marked-region-non-used t))
+          (overlay-put ol 'peek-lines
+                       (split-string peek-marked-region-text "\n"))
+          (peek-overlay-auto-set-content ol)
+          (setq peek-marked-region-non-used nil))
+        (peek-overlay--toggle-active ol)))
+    (peek-display--overlay-update)))
+
+;;;###autoload
+(defun peek-overlay-set-custom-content (str &optional window)
+  "Set custom content for the peek overlay window in current buffer.
+STR: content string.
+WINDOW: the attached window object in current buffer.  If nil, the use
+current window.
+You can pass STR with properties(like face) to show change
+the display of the content.  The STR will be splitted into
+lines so the peek window can be scrolled."
+  (unless global-peek-mode
+    (global-peek-mode 1))
+  (let ((ol (peek-get-or-create-window-overlay window)))
+    (overlay-put ol 'peek-type 'string)
+    (overlay-put ol 'peek-lines (split-string str "\n"))
+    (peek-overlay-auto-set-content ol)))
+
+;;;###autoload
 (defun peek-xref-definition-dwim ()
   "Peek xref definition (the same behavior as you call `xref-find-definitions').
 If the peek window is deactivated/invisible, then show peek window
@@ -586,33 +616,6 @@ for xref definition, else hide the peek window."
       (peek-overlay-auto-set-content ol))
     (peek-overlay--toggle-active ol)
     (peek-display--overlay-update)))
-
-;;;###autoload
-(define-minor-mode global-peek-mode
-  "Gloabl peek mode."
-  :global t
-  :lighter "peek"
-  :keymap peek-mode-keymap
-  (cond
-   (global-peek-mode
-    (when peek-enable-eldoc-message-integration ;; eldoc-message-function
-      (peek-overlay-eldoc-message-enable))
-    (when (and (>= emacs-major-version 28)
-               peek-enable-eldoc-display-integration) ;; eldoc-display-functions
-      (add-hook 'eldoc-display-functions #'peek-display-eldoc))
-    (peek-clean-all-overlays)
-    (run-with-timer peek-clean-dead-overlays-secs t 'peek-clean-dead-overlays)
-    ;; (add-to-list 'window-state-change-functions 'peek-clean-dead-overlays) ;; may cause performance error
-    (add-hook 'post-command-hook #'peek-display--overlay-update))
-   (t
-    (when peek-enable-eldoc-message-integration
-      (peek-overlay-eldoc-message-disable))
-    (when (and (>= emacs-major-version 28)
-               peek-enable-eldoc-display-integration)
-      (remove-hook 'eldoc-display-functions #'peek-display-eldoc))
-    (peek-clean-all-overlays)
-    ;; (setq window-state-change-functions (remove 'peek-clean-dead-overlays window-state-change-functions))
-    (remove-hook 'post-command-hook #'peek-display--overlay-update))))
 
 (provide 'peek)
 
