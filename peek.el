@@ -247,9 +247,9 @@ WDW: window body width"
          (total-column-number (if (display-graphic-p)
                                   window-body-width
                                 ;; terminal Emacs will pad '\' at the line end
-                                (1- window-body-width))) 
+                                (1- window-body-width)))
          ;; NOTE temporary solution for randomly exceeding 1 border character when
-         ;; use `peek-xref-definition-dwim' 
+         ;; use `peek-xref-definition-dwim'
          (total-column-number (1- total-column-number)))
     (when display-line-numbers-mode
       (setq total-column-number
@@ -353,8 +353,8 @@ The calculation is based on `peek-overlay-position' and `peek-overlay-distance'.
 Return position."
   (save-excursion
     (cl-case peek-overlay-position
-      (above (forward-line (- peek-overlay-distance)))
-      (below (forward-line (1+ peek-overlay-distance))))
+      ((above quote) (forward-line (- peek-overlay-distance)))
+      ((below quote) (forward-line (1+ peek-overlay-distance))))
     (point)))
 
 (defun peek-get-or-create-window-overlay (&optional window)
