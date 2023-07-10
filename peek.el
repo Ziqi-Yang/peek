@@ -43,6 +43,7 @@
 ;;; Code:
 
 (require 'display-line-numbers)
+(require 'cl-lib)
 
 (defgroup peek nil
   "Peek mode."
@@ -353,8 +354,9 @@ The calculation is based on `peek-overlay-position' and `peek-overlay-distance'.
 Return position."
   (save-excursion
     (cl-case peek-overlay-position
-      ((above quote) (forward-line (- peek-overlay-distance)))
-      ((below quote) (forward-line (1+ peek-overlay-distance))))
+      (above (forward-line (- peek-overlay-distance)))
+      (below (forward-line (1+ peek-overlay-distance)))
+      (t (error "Unrecognized value for `peek-overlay-position`.")))
     (point)))
 
 (defun peek-get-or-create-window-overlay (&optional window)
