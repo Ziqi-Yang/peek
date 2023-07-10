@@ -2,11 +2,11 @@
 
 ## Peek Marked Region
 
-![display marked region](./screenshots/display-marked-region.webp)
+![display marked region](./screenshots/marked-region.webp)
 
 ## Xref Find Definition
 
-![xref find definition](./screenshots/xref-find-definition.webp)
+![xref find definition](./screenshots/xref-definition.webp)
 
 ## Eldoc Message
 
