@@ -25,7 +25,8 @@
 
 ;;; Commentary:
 
-;; buffer local variable peek-window-overlay-map stores one overlay for every window
+;; buffer local variable peek-window-overlay-map stores
+;; one overlay for every window
 
 ;; custom properties for overlays:
 ;;   1. active: nil or t, control whether the overlay is visible/invisible
@@ -34,7 +35,8 @@
 ;;   2. peek-type: indicate the current type of overlay
 ;;       - 'string : marked region or eldoc message
 ;;       - 'xref   : xref-find-definition
-;;   3. peek-lines: list of string, only stores strings for 'string type overlay
+;;   3. peek-lines: list of string, only stores strings for 'string type
+;;       overlay
 ;;   4. peek-last-xref: string, last searched identifier for 'xref type overlay
 ;;   5. peek-offset: used for scrolling content inside peek window
 
