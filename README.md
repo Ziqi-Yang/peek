@@ -5,12 +5,12 @@
 [project](https://sr.ht/~meow_king/peek/)/[mailing lists](https://sr.ht/~meow_king/peek/lists)/[tickets](https://sr.ht/~meow_king/peek/trackers)  
 
 ## Features
-1. Peek window follows your cursor.
-2. Buffer and window local peek windows. Also capable for content sharing between different buffer and windows.
-3. Store text of marked region, and then display it on the peek window.
+1. Peek view follows your cursor.
+2. Buffer and window local peek views. Also capable for content sharing between different buffer and windows.
+3. Store text of marked region, and then display it on the peek view.
 4. Peek the destination of `xref-find-definitions`.
 5. `eldoc-message-function` and `eldoc-display-functions` integration.
-6. Scroll up or down inside peek window. 
+6. Scroll up or down inside peek view. 
 
 ## Demo
 
@@ -21,12 +21,12 @@
 - Store marked region and peek it later:
    1. Mark a region
    2. Use `peek-overlay-dwim` to store the region
-   3. Use `peek-overlay-dwim` again to show a peek window of the marked content. You can use this command in other buffer/window to show the marked content. 
-   4. Use `peek-overlay-dwim` to hidden the peek window.
+   3. Use `peek-overlay-dwim` again to show a peek view of the marked content. You can use this command in other buffer/window to show the marked content. 
+   4. Use `peek-overlay-dwim` to hidden the peek view.
    
 - Find definition of a symbol.
-   1. Use `peek-xref-definition-dwim` to show the definition at the cursor point in peek window.
-   2. Use `peek-xref-definition-dwim` again to hide the peek window. You can also use `peek-overlay-dwim` to do this job.
+   1. Use `peek-xref-definition-dwim` to show the definition at the cursor point in peek view.
+   2. Use `peek-xref-definition-dwim` again to hide the peek view. You can also use `peek-overlay-dwim` to do this job.
    
 - Display eldoc for the symbol under cursor.
   note: you need Emacs version >= 28.1  
@@ -38,13 +38,13 @@
   ```
   
   3. Use `eldoc` to diplay eldoc for the symbol under cursor.
-  4. Use `peek-overlay-dwim` to hide the peek window.
+  4. Use `peek-overlay-dwim` to hide the peek view.
   
 - Display eldoc message
   Customize `peek-enable-eldoc-message-integration` to `t` to enable the eldoc message integration. You may also want to customize `peek-eldoc-message-overlay-position` too.   
-  Note: `peek-overlay-eldoc-message-toggle-stauts` function can be used to toggle whether the peek window for eldoc message will be shown.
+  Note: `peek-overlay-eldoc-message-toggle-stauts` function can be used to toggle whether the peek view for eldoc message will be shown.
   
-- Scroll up/down in the peek window
+- Scroll up/down in the peek view
   - `M-n`: peek-next-line 
   - `M-p`: peek-prev-line 
 
@@ -59,7 +59,7 @@
   :custom
   ;; only list some mostly-want-changed settings 
   (peek-overlay-window-size 11) ;; lines
-  ;; one line before the place found by `xref-find-definitions' will also appear in peek window 
+  ;; one line before the place found by `xref-find-definitions' will also appear in peek view 
   (peek-xref-surrounding-above-lines 1)
   (peek-overlay-position 'above) ;; or below
 
@@ -101,7 +101,7 @@ Go to `customize` -> `peek`
 
 These API may be useful for advanced customization:
 
-- `eldoc-message-function` related API: `peek-overlay-eldoc-message-toggle-stauts`, `peek-overlay-eldoc-message-disable`, `peek-overlay-eldoc-message-enable`. Possible customization direction: for model editing mode like `evil`, you can use these function to only enable displaying eldoc message overlay(peek window) when in _insert_ mode.
+- `eldoc-message-function` related API: `peek-overlay-eldoc-message-toggle-stauts`, `peek-overlay-eldoc-message-disable`, `peek-overlay-eldoc-message-enable`. Possible customization direction: for model editing mode like `evil`, you can use these function to only enable displaying eldoc message overlay(peek view) when in _insert_ mode.
 
 - `peek-overlay-set-custom-content`, `peek-overlay-toggle`, `peek-overlay-hide`, `peek-overlay-show`
 
