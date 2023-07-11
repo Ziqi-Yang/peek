@@ -105,7 +105,7 @@ Go to `customize` -> `peek`
 
 These API may be useful for advanced customization:
 
-- `eldoc-message-function` related API: `peek-overlay-eldoc-message-toggle-stauts`, `peek-overlay-eldoc-message-disable`, `peek-overlay-eldoc-message-enable`. Possible customization direction: for model editing mode like `evil`, you can use these function to only enable displaying eldoc message overlay(peek view) when in _insert_ mode. Personally I use `meow`, this is my settings:
+- `eldoc-message-function` related API: `peek-overlay-eldoc-message-toggle-stauts`, `peek-overlay-eldoc-message-disable`, `peek-overlay-eldoc-message-enable`. Possible customization direction: for model editing mode like `evil`, you can use these function to only enable displaying eldoc message overlay(peek view) when in _insert_ mode. Personally I use [meow](https://github.com/meow-edit/meow), and this is my settings:
 
 ``` emacs-lisp
 (add-hook 'meow-insert-enter-hook 'peek-overlay-eldoc-message-enable)

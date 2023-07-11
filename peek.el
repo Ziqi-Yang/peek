@@ -626,6 +626,7 @@ for xref definition, else hide the peek window."
     (peek-overlay--toggle-active ol)
     (peek-display--overlay-update)))
 
+
 (provide 'peek)
 
 ;;; peek.el ends here
