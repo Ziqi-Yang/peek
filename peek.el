@@ -372,7 +372,6 @@ If there isn't one, the create it."
 ;;;###autoload
 (defun peek-overlay-eldoc-message-hide ()
   "Hide peek eldoc message overlay."
-  (interactive)
   (when peek-eldoc-message-overlay
     (peek-overlay--set-active peek-eldoc-message-overlay nil)))
 
@@ -381,9 +380,11 @@ If there isn't one, the create it."
   "Show peek eldoc message overlay."
   (interactive)
   (add-hook 'post-command-hook #'peek-overlay-eldoc-message-hide)
-  (setq peek-eldoc-message-status t
-        peek-eldoc-previous-message-function eldoc-message-function
-        eldoc-message-function 'peek-overlay-eldoc-message-function))
+  (setq peek-eldoc-message-status t)
+  ;; avoid covering `peek-eldoc-previous-message-function'
+  (unless (eq eldoc-message-function 'peek-overlay-eldoc-message-function)
+    (setq peek-eldoc-previous-message-function eldoc-message-function
+          eldoc-message-function 'peek-overlay-eldoc-message-function)))
 
 ;;;###autoload
 (defun peek-overlay-eldoc-message-disable ()
