@@ -4,6 +4,10 @@
 
 [project](https://sr.ht/~meow_king/peek/)/[mailing lists](https://sr.ht/~meow_king/peek/lists)/[tickets](https://sr.ht/~meow_king/peek/trackers)  
 
+This package allow you to create a peek view below/above cursor point to show things.
+
+Note: this package is still in frequent updating, with function name changing possibly. 
+
 ## Features
 1. Peek view follows your cursor.
 2. Buffer and window local peek views. Also capable for content sharing between different buffer and windows.
@@ -101,7 +105,12 @@ Go to `customize` -> `peek`
 
 These API may be useful for advanced customization:
 
-- `eldoc-message-function` related API: `peek-overlay-eldoc-message-toggle-stauts`, `peek-overlay-eldoc-message-disable`, `peek-overlay-eldoc-message-enable`. Possible customization direction: for model editing mode like `evil`, you can use these function to only enable displaying eldoc message overlay(peek view) when in _insert_ mode.
+- `eldoc-message-function` related API: `peek-overlay-eldoc-message-toggle-stauts`, `peek-overlay-eldoc-message-disable`, `peek-overlay-eldoc-message-enable`. Possible customization direction: for model editing mode like `evil`, you can use these function to only enable displaying eldoc message overlay(peek view) when in _insert_ mode. Personally I use `meow`, this is my settings:
+
+``` emacs-lisp
+(add-hook 'meow-insert-enter-hook 'peek-overlay-eldoc-message-enable)
+(add-hook 'meow-insert-exit-hook 'peek-overlay-eldoc-message-disable)
+```
 
 - `peek-overlay-set-custom-content`, `peek-overlay-toggle`, `peek-overlay-hide`, `peek-overlay-show`
 
