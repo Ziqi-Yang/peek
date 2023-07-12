@@ -27,10 +27,11 @@ Note: this package is still in frequent updating, with function name changing po
    1. Mark a region
    2. Use `peek-overlay-dwim` to store the region
    3. Use `peek-overlay-dwim` again to show a peek view of the marked content. You can use this command in other buffer/window to show the marked content. 
-   4. Use `peek-overlay-dwim` to hidden the peek view.
+   4. Use `peek-overlay-dwim` to hidden the peek view.  
    Tips: You can make the peek view of the marked region automatically updated by 
    customize `peek-live-update` to `t`. Or you want to manually update content, you
-   can use `peek-view-refresh` command.
+   can use `peek-view-refresh` command. It should be noted that live updating/refreshing
+   peek view can only be done when the source buffer(owns marked region) is alive.
    
 - Find definition of a symbol.
    1. Use `peek-xref-definition-dwim` to show the definition at the cursor point in peek view.
@@ -100,7 +101,10 @@ Note: this package is still in frequent updating, with function name changing po
   ;; Eldoc display setting
   ;; Besides making `peek-enable-eldoc-display-integration' to t, you may want to remove
   ;;   other eldoc display functions.
-  (remove-hook 'eldoc-display-functions 'eldoc-display-in-buffer))
+  (remove-hook 'eldoc-display-functions 'eldoc-display-in-buffer)
+  
+  ;; you may also want to set scroll margin (see its docs)
+  (setq scroll-margin 5))
 ```
 
 ### All Customization Variables
