@@ -15,6 +15,7 @@ Note: this package is still in frequent updating, with function name changing po
 4. Peek the destination of `xref-find-definitions`.
 5. `eldoc-message-function` and `eldoc-display-functions` integration.
 6. Scroll up or down inside peek view. 
+7. live update
 
 ## Demo
 
@@ -27,12 +28,15 @@ Note: this package is still in frequent updating, with function name changing po
    2. Use `peek-overlay-dwim` to store the region
    3. Use `peek-overlay-dwim` again to show a peek view of the marked content. You can use this command in other buffer/window to show the marked content. 
    4. Use `peek-overlay-dwim` to hidden the peek view.
+   Tips: You can make the peek view of the marked region automatically updated by 
+   customize `peek-live-update` to `t`. Or you want to manually update content, you
+   can use `peek-view-refresh` command.
    
 - Find definition of a symbol.
    1. Use `peek-xref-definition-dwim` to show the definition at the cursor point in peek view.
    2. Use `peek-xref-definition-dwim` again to hide the peek view. You can also use `peek-overlay-dwim` to do this job.
    
-- Display eldoc for the symbol under cursor.
+- Display eldoc for the symbol under cursor.  
   note: you need Emacs version >= 28.1  
   1. Customize `peek-enable-eldoc-display-integration' to t.
   2. You may also want to remove other eldoc display functions
@@ -44,7 +48,7 @@ Note: this package is still in frequent updating, with function name changing po
   3. Use `eldoc` to diplay eldoc for the symbol under cursor.
   4. Use `peek-overlay-dwim` to hide the peek view.
   
-- Display eldoc message
+- Display eldoc message  
   Customize `peek-enable-eldoc-message-integration` to `t` to enable the eldoc message integration. You may also want to customize `peek-eldoc-message-overlay-position` too.   
   Note: `peek-overlay-eldoc-message-toggle-stauts` function can be used to toggle whether the peek view for eldoc message will be shown.
   
@@ -66,6 +70,8 @@ Note: this package is still in frequent updating, with function name changing po
   ;; one line before the place found by `xref-find-definitions' will also appear in peek view 
   (peek-xref-surrounding-above-lines 1)
   (peek-overlay-position 'above) ;; or below
+  
+  (peek-live-update t) ;; live update peek view of a marked region
 
   (peek-enable-eldoc-message-integration t) ;; enable `eldoc-message-function' integration
   ;; eldoc message overlay at two lines below the point
