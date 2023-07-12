@@ -161,22 +161,23 @@ the `global-peek-mode'.")
   "This variable shouldn't be customized by user.
 Variable structure: { window: overlay }.")
 
-(defvar peek-marked-region-text nil
-  "Store the last stored marked region text.")
+(defvar-local peek-live-update-associated-overlays nil
+  "Associated overlays for this buffer.
+This variable is used to update associated overlays when certain part of this
+buffer change.
+Related hook: `after-change-functions'.")
 
-(defvar peek-marked-region-non-used nil
-  "Indicate that `peek-marked-region-text' hasn't been used.
+(defvar peek-marked-region-markers nil
+  "Store the last stored marked region markers (beginning marker . end marker).")
+
+(defvar peek-marked-region-unused nil
+  "Indicate that `peek-marked-region-markers' hasn't been used.
 This variable is used to make sure that the right peek overlay show after
 storing a marked region can cross buffers.
 So later peek window toggles are still buffer-local.")
 
-(defvar peek-live-update-buffer-map
-  (make-hash-table :test 'equal)
-  "Content buffer -> peek view: (buffer, window).
-Related hook: `after-change-functions'.")
-
 ;;; =============================================================================
-;;; Functions related to underlying structures
+;;; Base Functions
 ;;; =============================================================================
 
 (defun peek--ensure-window-overlay-map ()
@@ -356,6 +357,17 @@ If WINDOW is nil, then show overlay in the current window."
   (let ((ol (peek-get-window-overlay window)))
     (peek-overlay--toggle-active ol)))
 
+(defun peek--regions-overlap (p1 p2 p3 p4)
+  "Detect whether the two region are overlapped.
+The openness and closeness of the given regions should be the same as marker
+region.
+Return boolean."
+  (if (or (< p2 p1) (< p4 p3))
+      (error "p2 should >= p1, p4 should >= p3")
+    (if (or (<= p4 p1) (<= p2 p3))
+        nil
+      t)))
+
 ;;; =============================================================================
 ;;; Main Functions
 ;;; =============================================================================
@@ -370,30 +382,48 @@ OL: overlay. Get current overlay if OL is nil."
              (pos (peek-overlay--get-supposed-position)))
     (move-overlay ol pos pos)))
 
-(defun peek-after-change-function (rb rn _plen)
+(defun peek-after-change-function (rb re _plen)
   "This function is used for `after-change-functions' to live update peek view."
-  (let* ((origin_buffer_window ()))
-    ;; TODO
-    ))
+  (dolist (ol peek-live-update-associated-overlays)
+    (if (eq (current-buffer) (marker-buffer (car (overlay-get ol 'peek-markers))))
+        ;; if ol's source buffer is still the current buffer
+        (cl-case (overlay-get ol 'peek-type)
+          (string
+           (when-let ((markers (overlay-get ol 'peek-markers))
+                      (srb (marker-position (car markers)))  ; source region beginning
+                      (sre (marker-position (cdr markers)))  ; source region end
+                      ;; when region overlapped (change occurs in source region)
+                      ((peek--regions-overlap srb sre rb re))
+                      (text (buffer-substring srb sre)))
+             (overlay-put ol 'peek-lines
+                          (split-string text "\n"))
+             (peek-overlay-auto-set-content ol)))
+          (xref  ; TODO
+           ())
+          (t
+           (error "Unmatched type!")))
+      ;; remove ol when ol's source buffer isn't the current buffer
+      (setq peek-live-update-associated-overlays
+            (delete ol peek-live-update-associated-overlays))))
+  ;; remove hook when there is no associated overlays
+  (when (length= peek-live-update-associated-overlays 0)
+    (remove-hook 'after-change-functions 'peek-after-change-function t)))
 
-(defun peek--get-active-region-text (ol)
+(defun peek--mark-region ()
   "Get text with properties in region.
 OL: overlay
-Return nil if region is not active."
+Return two markers (mb . me) represent the beginning and the end of the region.
+Return nil if there is no region."
   (when (use-region-p)
     (let* ((rb (region-beginning))
            (re (region-end))
-           (text (buffer-substring rb re)))
-      ;; set marker
-      (setq mb (make-marker)
-            me (make-marker))
+           (mb (make-marker))
+           (me (make-marker)))
       (set-marker mb rb (current-buffer))
       (set-marker me re (current-buffer))
-      (overlay-put ol 'peek-markers (cons mb me))
-      ;; TODO
-      ;; add hook
+      
       (setq mark-active nil)  ; deactivate region mark
-      text)))
+      (cons mb me))))
 
 (defun peek-overlay--get-supposed-position ()
   "Get the supposed position of a overlay.
@@ -619,16 +649,28 @@ things not change)."
     (overlay-put ol 'peek-type 'string)
     (if (use-region-p)
         (progn
-          (setq peek-marked-region-text (peek--get-active-region-text)
-                peek-marked-region-non-used t)
+          (setq peek-marked-region-markers (peek--mark-region)
+                peek-marked-region-unused t)
           (message "region stored"))
       (progn
         (when (and (eq (overlay-get ol 'active) nil)  ; after toggle, overlay show
-                   (eq peek-marked-region-non-used t))
-          (overlay-put ol 'peek-lines
-                       (split-string peek-marked-region-text "\n"))
+                   (eq peek-marked-region-unused t))
+          (let* ((mb (car peek-marked-region-markers))
+                 (me (cdr peek-marked-region-markers))
+                 (source-buffer (marker-buffer mb))
+                 (text (with-current-buffer source-buffer
+                         (buffer-substring
+                          (marker-position mb) (marker-position me)))))
+            (overlay-put ol 'peek-markers peek-marked-region-markers)
+            (with-current-buffer source-buffer
+              ;; add this overlay to source buffer associated overlay list
+              (add-to-list 'peek-live-update-associated-overlays ol)
+              ;; add local hook
+              (add-hook 'after-change-functions 'peek-after-change-function nil t))
+            (overlay-put ol 'peek-lines
+                         (split-string text "\n")))
           (peek-overlay-auto-set-content ol)
-          (setq peek-marked-region-non-used nil))
+          (setq peek-marked-region-unused nil))
         (peek-overlay--toggle-active ol)))
     (peek-display--overlay-update ol)))
 
