@@ -42,7 +42,6 @@
 ;;   6. peek-markers:
 ;;       - 'string: (begin-marker, end-marker). Used to mark the beginning
 ;;         and the end of the region. Used to live update content.
-;;       - 'file: TODO
 
 ;;; Code:
 
