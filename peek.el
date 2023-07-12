@@ -93,6 +93,11 @@ This value should be less than the
   :type 'natnum
   :group 'peek)
 
+(defcustom peek-live-update t
+  "Whether to automatically update content when text in marked region changes."
+  :type 'boolean
+  :group 'peek)
+
 (defcustom peek-mode-keymap
   (let ((map (make-sparse-keymap)))
     ;; Browse file
@@ -399,8 +404,7 @@ OL: overlay. Get current overlay if OL is nil."
              (overlay-put ol 'peek-lines
                           (split-string text "\n"))
              (peek-overlay-auto-set-content ol)))
-          (xref  ; TODO
-           ())
+          (xref nil)  ; do nothing
           (t
            (error "Unmatched type!")))
       ;; remove ol when ol's source buffer isn't the current buffer
@@ -662,18 +666,37 @@ things not change)."
                  (text (with-current-buffer source-buffer
                          (buffer-substring
                           (marker-position mb) (marker-position me)))))
+            (when peek-live-update
+              (with-current-buffer source-buffer
+                ;; add this overlay to source buffer associated overlay list
+                (add-to-list 'peek-live-update-associated-overlays ol)
+                ;; add local hook
+                (add-hook 'after-change-functions 'peek-after-change-function nil t)))
             (overlay-put ol 'peek-markers peek-marked-region-markers)
-            (with-current-buffer source-buffer
-              ;; add this overlay to source buffer associated overlay list
-              (add-to-list 'peek-live-update-associated-overlays ol)
-              ;; add local hook
-              (add-hook 'after-change-functions 'peek-after-change-function nil t))
             (overlay-put ol 'peek-lines
                          (split-string text "\n")))
           (peek-overlay-auto-set-content ol)
           (setq peek-marked-region-unused nil))
         (peek-overlay--toggle-active ol)))
     (peek-display--overlay-update ol)))
+
+;;;###autoload
+(defun peek-view-refresh ()
+  "Refresh content in the current peek view.
+Peek view will only be refreshed when it is used to display a marked region."
+  (interactive)
+  (when-let ((ol (peek-get-window-overlay))
+             ((eq (overlay-get ol 'peek-type) 'string)) ; NOTE
+             (markers (overlay-get ol 'peek-markers))
+             (mb (car markers))
+             (me (cdr markers))
+             (source-buffer (marker-buffer mb))
+             (text (with-current-buffer source-buffer
+                     (buffer-substring
+                      (marker-position mb) (marker-position me)))))
+    (overlay-put ol 'peek-lines
+                 (split-string text "\n"))
+    (peek-overlay-auto-set-content ol)))
 
 ;;;###autoload
 (defun peek-overlay-set-custom-content (str &optional window)
@@ -706,7 +729,6 @@ for xref definition, else hide the peek view."
       (peek-overlay-auto-set-content ol))
     (peek-overlay--toggle-active ol)
     (peek-display--overlay-update ol)))
-
 
 (provide 'peek)
 
