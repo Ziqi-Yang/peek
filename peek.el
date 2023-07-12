@@ -38,7 +38,7 @@
 ;;   3. peek-lines: list of string, only stores strings for 'string type
 ;;       overlay
 ;;   4. peek-last-xref: string, last searched identifier for 'xref type overlay
-;;   5. peek-offset: used for scrolling content inside peek window
+;;   5. peek-offset: used for scrolling content inside peek view
 ;;   6. peek-markers:
 ;;       - 'string: (begin-marker, end-marker). Used to mark the beginning
 ;;         and the end of the region. Used to live update content.
@@ -54,7 +54,7 @@
   :group 'convenient)
 
 (defcustom peek-method 'overlay
-  "Preferred method to display peek window."
+  "Preferred method to display peek view."
   :type '(choice (const :tag "use overlay" overlay)
                  (const :tag "use child frame" frame))
   :group 'peek)
@@ -87,7 +87,7 @@
   :group 'peek)
 
 (defcustom peek-xref-surrounding-above-lines 1
-  "Number of Lines above the xref definition to be shown in peek window.
+  "Number of Lines above the xref definition to be shown in peek view.
 This value should be less than the
 `peek-overlay-window-size', otherwise undefined behavior."
   :type 'natnum
@@ -121,13 +121,13 @@ This value should be less than the
   :group 'peek)
 
 (defcustom peek-enable-eldoc-message-integration nil
-  "Show eldoc message on a peek window.
+  "Show eldoc message on a peek view.
 Related function: `eldoc-message-function'."
   :type 'boolean
   :group 'peek)
 
 (defcustom peek-enable-eldoc-display-integration nil
-  "Show eldoc docs inside a peek window.
+  "Show eldoc docs inside a peek view.
 Note you need Emacs version >= 28.1.
 Related function: `eldoc-display-functions'."
   :type 'boolean
@@ -174,7 +174,7 @@ Related hook: `after-change-functions'.")
   "Indicate that `peek-marked-region-markers' hasn't been used.
 This variable is used to make sure that the right peek overlay show after
 storing a marked region can cross buffers.
-So later peek window toggles are still buffer-local.")
+So later peek view toggles are still buffer-local.")
 
 ;;; =============================================================================
 ;;; Base Functions
@@ -385,7 +385,8 @@ OL: overlay. Get current overlay if OL is nil."
 (defun peek-after-change-function (rb re _plen)
   "This function is used for `after-change-functions' to live update peek view."
   (dolist (ol peek-live-update-associated-overlays)
-    (if (eq (current-buffer) (marker-buffer (car (overlay-get ol 'peek-markers))))
+    (if (and (not (length= (overlay-get ol 'peek-markers) 0))  ; string not from region
+             (eq (current-buffer) (marker-buffer (car (overlay-get ol 'peek-markers)))))
         ;; if ol's source buffer is still the current buffer
         (cl-case (overlay-get ol 'peek-type)
           (string
@@ -571,7 +572,7 @@ XULI: xref use last identifier."
 
 ;;;###autoload
 (defun peek-next-line ()
-  "Scroll down current peek window 1 line.
+  "Scroll down current peek view 1 line.
 Only works when overlay is active/visible."
   (interactive)
   (when-let ((ol (peek-get-or-create-window-overlay))
@@ -590,7 +591,7 @@ Only works when overlay is active/visible."
 
 ;;;###autoload
 (defun peek-prev-line ()
-  "Scroll up current peek window 1 line.
+  "Scroll up current peek view 1 line.
 Only works when overlay is active/visible."
   (interactive)
   (when-let ((ol (peek-get-or-create-window-overlay))
@@ -639,7 +640,7 @@ If there is an active region, then store the region into the overlay
 in the current window;
 Else toggle the display of the overlay.
 Related features:
-  - store marked region, hide/show peek window.
+  - store marked region, hide/show peek view.
   - hide eldoc display.(and is able to show eldoc display again if
 things not change)."
   (interactive)
@@ -682,19 +683,20 @@ WINDOW: the attached window object in current buffer.  If nil, the use
 current window.
 You can pass STR with properties(like face) to show change
 the display of the content.  The STR will be splitted into
-lines so the peek window can be scrolled."
+lines so the peek view can be scrolled."
   (unless global-peek-mode
     (global-peek-mode 1))
   (let ((ol (peek-get-or-create-window-overlay window)))
     (overlay-put ol 'peek-type 'string)
+    (overlay-put ol 'peek-markers nil)
     (overlay-put ol 'peek-lines (split-string str "\n"))
     (peek-overlay-auto-set-content ol)))
 
 ;;;###autoload
 (defun peek-xref-definition-dwim ()
   "Peek xref definition (the same behavior as you call `xref-find-definitions').
-If the peek window is deactivated/invisible, then show peek window
-for xref definition, else hide the peek window."
+If the peek view is deactivated/invisible, then show peek view
+for xref definition, else hide the peek view."
   (interactive)
   (unless global-peek-mode
     (global-peek-mode 1))
