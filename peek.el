@@ -39,6 +39,10 @@
 ;;       overlay
 ;;   4. peek-last-xref: string, last searched identifier for 'xref type overlay
 ;;   5. peek-offset: used for scrolling content inside peek window
+;;   6. peek-markers:
+;;       - 'string: (begin-marker, end-marker). Used to mark the beginning
+;;         and the end of the region. Used to live update content.
+;;       - 'file: TODO
 
 ;;; Code:
 
@@ -166,6 +170,15 @@ This variable is used to make sure that the right peek overlay show after
 storing a marked region can cross buffers.
 So later peek window toggles are still buffer-local.")
 
+(defvar peek-live-update-buffer-map
+  (make-hash-table :test 'equal)
+  "Content buffer -> peek view: (buffer, window).
+Related hook: `after-change-functions'.")
+
+;;; =============================================================================
+;;; Functions related to underlying structures
+;;; =============================================================================
+
 (defun peek--ensure-window-overlay-map ()
   "If the hash table for current buffer hasn't been initialized, then create it."
   (unless peek-window-overlay-map
@@ -230,13 +243,31 @@ Return the newly created overlay."
     (overlay-put ol 'peek-last-xref "")
     (puthash (get-buffer-window) ol peek-window-overlay-map)))
 
-(defun peek--get-active-region-text ()
-  "Get text with properties in region.
-Return nil if region is not active."
-  (when (use-region-p)
-    (let ((text (buffer-substring (region-beginning) (region-end))))
-      (setq mark-active nil)  ; deactivate region mark
-      text)))
+(defun peek-get-or-create-window-overlay (&optional window)
+  "Get or create a overlay for WINDOW.
+If window is nil, the use current WINDOW.
+Get the the given(or current if not given) window's peek overlay.
+If there isn't one, the create it."
+  (let ((ol (peek-get-window-overlay window)))
+    (unless ol
+      (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
+    ol))
+
+(defun peek-overlay--set-active (ol active)
+  "Set active/visibility of the given overlay.
+OL: overlay object
+ACTIVE: boolean type: t stands for visible, nil stands for invisible
+Please ensure `after-string' property of OL isn't nil,
+otherwise this function does nothing."
+  (when-let (((booleanp active)) ;; ensure `active' is nil or t
+             (after-str (overlay-get ol 'after-string)))  ; ensure after-str isn't nil
+    (if active
+        (progn
+          (overlay-put ol 'active t)
+          (overlay-put ol 'after-string (propertize after-str 'display nil)))
+      (progn
+        (overlay-put ol 'active nil)
+        (overlay-put ol 'after-string (propertize after-str 'display ""))))))
 
 (defun peek-overlay--format-make-border (&optional wdw)
   "Return the border string which is supposed to be used in overlay.
@@ -292,22 +323,6 @@ WDW: window body width."
     (overlay-put ol 'after-string
                  (propertize content 'display display))))
 
-(defun peek-overlay--set-active (ol active)
-  "Set active/visibility of the given overlay.
-OL: overlay object
-ACTIVE: boolean type: t stands for visible, nil stands for invisible
-Please ensure `after-string' property of OL isn't nil,
-otherwise this function does nothing."
-  (when-let (((booleanp active)) ;; ensure `active' is nil or t
-             (after-str (overlay-get ol 'after-string)))  ; ensure after-str isn't nil
-    (if active
-        (progn
-          (overlay-put ol 'active t)
-          (overlay-put ol 'after-string (propertize after-str 'display nil)))
-      (progn
-        (overlay-put ol 'active nil)
-        (overlay-put ol 'after-string (propertize after-str 'display ""))))))
-
 (defun peek-overlay--toggle-active (ol)
   "Set active/visibility of the given overlay.
 OL: overlay object
@@ -341,12 +356,44 @@ If WINDOW is nil, then show overlay in the current window."
   (let ((ol (peek-get-window-overlay window)))
     (peek-overlay--toggle-active ol)))
 
-(defun peek-display--overlay-update ()
-  "Update the overlay position in the current window if overlay is active."
-  (when-let ((ol (peek-get-window-overlay))
+;;; =============================================================================
+;;; Main Functions
+;;; =============================================================================
+
+(defun peek-display--overlay-update (&optional ol)
+  "Update the overlay position if overlay is active.
+OL: overlay. Get current overlay if OL is nil."
+  (when-let ((ol (if (overlayp ol)
+                     ol
+                   (peek-get-window-overlay)))
              ((overlay-get ol 'active))  ; only update when overlay is active/visible
              (pos (peek-overlay--get-supposed-position)))
     (move-overlay ol pos pos)))
+
+(defun peek-after-change-function (rb rn _plen)
+  "This function is used for `after-change-functions' to live update peek view."
+  (let* ((origin_buffer_window ()))
+    ;; TODO
+    ))
+
+(defun peek--get-active-region-text (ol)
+  "Get text with properties in region.
+OL: overlay
+Return nil if region is not active."
+  (when (use-region-p)
+    (let* ((rb (region-beginning))
+           (re (region-end))
+           (text (buffer-substring rb re)))
+      ;; set marker
+      (setq mb (make-marker)
+            me (make-marker))
+      (set-marker mb rb (current-buffer))
+      (set-marker me re (current-buffer))
+      (overlay-put ol 'peek-markers (cons mb me))
+      ;; TODO
+      ;; add hook
+      (setq mark-active nil)  ; deactivate region mark
+      text)))
 
 (defun peek-overlay--get-supposed-position ()
   "Get the supposed position of a overlay.
@@ -358,16 +405,6 @@ Return position."
       (below (forward-line (1+ peek-overlay-distance)))
       (t (error "Unrecognized value for `peek-overlay-position`.")))
     (point)))
-
-(defun peek-get-or-create-window-overlay (&optional window)
-  "Get or create a overlay for WINDOW.
-If window is nil, the use current WINDOW.
-Get the the given(or current if not given) window's peek overlay.
-If there isn't one, the create it."
-  (let ((ol (peek-get-window-overlay window)))
-    (unless ol
-      (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
-    ol))
 
 ;;;###autoload
 (defun peek-overlay-eldoc-message-hide ()
@@ -447,7 +484,7 @@ Only works when INTERACTIVE is t."
                    (split-string docs-content "\n"))
       (peek-overlay-auto-set-content ol)
       (peek-overlay--set-active ol t)
-      (peek-display--overlay-update))))
+      (peek-display--overlay-update ol))))
 
 (defun peek--xref-get-surrounding-text (above)
   "Get surrounding content for xref definition.
@@ -593,7 +630,7 @@ things not change)."
           (peek-overlay-auto-set-content ol)
           (setq peek-marked-region-non-used nil))
         (peek-overlay--toggle-active ol)))
-    (peek-display--overlay-update)))
+    (peek-display--overlay-update ol)))
 
 ;;;###autoload
 (defun peek-overlay-set-custom-content (str &optional window)
@@ -624,7 +661,7 @@ for xref definition, else hide the peek window."
     (unless (overlay-get ol 'active)  ; set content before shown
       (peek-overlay-auto-set-content ol))
     (peek-overlay--toggle-active ol)
-    (peek-display--overlay-update)))
+    (peek-display--overlay-update ol)))
 
 
 (provide 'peek)
