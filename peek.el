@@ -680,18 +680,17 @@ If there is an active region, then store the region into the overlay
 in the current window;
 Else toggle the display of the overlay.
 Related features:
-  - store marked region, hide/show peek view.
-  - hide eldoc display.(and is able to show eldoc display again if
-things not change)."
+  - store marked region
+  - hide/show peek view. "
   (interactive)
   (unless global-peek-mode
     (global-peek-mode 1))
   (let ((ol (peek-get-or-create-window-overlay)))
-    (unless (eq (overlay-get ol 'peek-type) 'string)
-      (overlay-put ol 'peek-offset 0)
-      (overlay-put ol 'peek-type 'string))
     (if (use-region-p)
         (progn
+          (unless (eq (overlay-get ol 'peek-type) 'string)
+            (overlay-put ol 'peek-offset 0)
+            (overlay-put ol 'peek-type 'string))
           (setq peek-marked-region-markers (peek--mark-region)
                 peek-marked-region-unused t)
           (message "region stored"))
