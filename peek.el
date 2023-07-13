@@ -537,6 +537,7 @@ lines above the point with `peek-overlay-window-size' height. "
     (setq p1 (point))
     (forward-line (+ above peek-overlay-window-size))
     (setq p2 (line-end-position))
+    (font-lock-ensure p1 p2)
     (buffer-substring p1 p2)))
 
 (defun peek-definition--set-marker (ol func &optional args)
