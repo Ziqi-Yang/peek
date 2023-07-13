@@ -557,7 +557,7 @@ FUNC, ARGS see `peek-definition'."
     ;; get content
     (setq content (peek-definition--get-surrounding-text))
     ;; go back to original place
-    (set-buffer buffer)
+    (switch-to-buffer buffer)
     (goto-char pos)
     content))
 
