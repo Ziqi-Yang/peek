@@ -34,19 +34,20 @@
 ;;       corresponding method instead
 ;;   2. peek-type: indicate the current type of overlay
 ;;       - 'string : marked region or eldoc message
-;;       - 'xref   : xref-find-definition
+;;       - 'definition
 ;;   3. peek-lines: list of string, only stores strings for 'string type
 ;;       overlay
-;;   4. peek-last-xref: string, last searched identifier for 'xref type overlay
 ;;   5. peek-offset: used for scrolling content inside peek view
 ;;   6. peek-markers:
 ;;       - 'string: (begin-marker, end-marker). Used to mark the beginning
 ;;         and the end of the region. Used to live update content.
+;;       - 'definition: (marker). Stores the marker of a definition. 
 
 ;;; Code:
 
 (require 'display-line-numbers)
 (require 'cl-lib)
+(require 'xref)
 
 (defgroup peek nil
   "Peek mode."
@@ -179,6 +180,12 @@ Related hook: `after-change-functions'.")
 This variable is used to make sure that the right peek overlay show after
 storing a marked region can cross buffers.
 So later peek view toggles are still buffer-local.")
+
+(defvar peek-definition-func nil
+  "This variable stores a function which is used to go to definition.")
+
+(defvar peek-definition-func-args nil
+  "This variable stores the arguments passed to `peek-definition-func'.")
 
 ;;; =============================================================================
 ;;; Base Functions
@@ -389,28 +396,27 @@ OL: overlay. Get current overlay if OL is nil."
 (defun peek-after-change-function (rb re _plen)
   "This function is used for `after-change-functions' to live update peek view."
   (dolist (ol peek-live-update-associated-overlays)
-    (if (and (not (length= (overlay-get ol 'peek-markers) 0))  ; string not from region
-             (eq (current-buffer) (marker-buffer (car (overlay-get ol 'peek-markers)))))
-        ;; if ol's source buffer is still the current buffer
-        (cl-case (overlay-get ol 'peek-type)
-          (string
-           (when-let ((markers (overlay-get ol 'peek-markers))
-                      (srb (marker-position (car markers)))  ; source region beginning
-                      (sre (marker-position (cdr markers)))  ; source region end
-                      ;; when region overlapped (change occurs in source region)
-                      ((peek--regions-overlap srb sre rb re))
-                      (text (buffer-substring srb sre)))
-             (overlay-put ol 'peek-lines
-                          (split-string text "\n"))
-             (peek-overlay-auto-set-content ol)))
-          (xref nil)  ; do nothing
-          (t
-           (error "Unmatched type!")))
+    (message "%s" (overlay-get ol 'peek-markers))
+    (if (and (eq (overlay-get ol 'peek-type) 'string)
+             (consp (overlay-get ol 'peek-markers))  ; string from region
+             ;; the region of ol is still in this buffer
+             (eq (current-buffer)
+                 (marker-buffer (car (overlay-get ol 'peek-markers)))))
+        (progn
+          (when-let ((markers (overlay-get ol 'peek-markers))
+                     (srb (marker-position (car markers)))  ; source region beginning
+                     (sre (marker-position (cdr markers)))  ; source region end
+                     ;; when region overlapped (change occurs in source region)
+                     ((peek--regions-overlap srb sre rb re))
+                     (text (buffer-substring srb sre)))
+            (overlay-put ol 'peek-lines
+                         (split-string text "\n"))
+            (peek-overlay-auto-set-content ol)))
       ;; remove ol when ol's source buffer isn't the current buffer
       (setq peek-live-update-associated-overlays
             (delete ol peek-live-update-associated-overlays))))
   ;; remove hook when there is no associated overlays
-  (when (length= peek-live-update-associated-overlays 0)
+  (when (= (length peek-live-update-associated-overlays) 0)
     (remove-hook 'after-change-functions 'peek-after-change-function t)))
 
 (defun peek--mark-region ()
@@ -520,32 +526,51 @@ Only works when INTERACTIVE is t."
       (peek-overlay--set-active ol t)
       (peek-display--overlay-update ol))))
 
-(defun peek--xref-get-surrounding-text (above)
+(defun peek-definition--get-surrounding-text ()
   "Get surrounding content for xref definition.
-Get surrounding content around point from ABOVE lines above
-point with `peek-overlay-window-size' height.
-Both ABOVE and BELOW need to be non-negative"
-  (save-excursion
-    (let (p1 p2)
-      (forward-line (- above))
-      (setq p1 (point))
-      (forward-line (+ above peek-overlay-window-size))
-      (setq p2 (line-end-position))
-      (buffer-substring p1 p2))))
+Get surrounding content around point from `peek-xref-surrounding-above-lines'
+lines above the point with `peek-overlay-window-size' height. "
+  (let ((above peek-xref-surrounding-above-lines)
+        p1 p2)
+    (forward-line (- above))
+    (setq p1 (point))
+    (forward-line (+ above peek-overlay-window-size))
+    (setq p2 (line-end-position))
+    (buffer-substring p1 p2)))
 
-(defun peek-overlay-get-content--xref (ol &optional xuli)
-  "Get content for xref definition.
-OL: overlay.
-XULI: xref use last identifier, boolean type"
-  (unless xuli
-    (overlay-put ol 'peek-last-xref (thing-at-point 'symbol)))
-  (xref-find-definitions (overlay-get ol 'peek-last-xref))
-  (forward-line (overlay-get ol 'peek-offset))
-  (let ((content (peek--xref-get-surrounding-text peek-xref-surrounding-above-lines)))
-    (if (>= emacs-major-version 29)
-        (xref-go-back)
-      (xref-pop-marker-stack))
+(defun peek-definition--set-marker (ol func &optional args)
+  "Call get definition function, set marker of that function and get the content.
+OL: overlay
+FUNC, ARGS see `peek-definition'."
+  (let ((buffer (current-buffer))
+        (pos (point))
+        (marker (make-marker))
+        content)
+    ;; go to definition
+    (apply func args)
+    ;; set marker for the definition
+    (set-marker marker (point) (current-buffer))
+    (overlay-put ol 'peek-markers (list marker))
+    ;; set peek-offset to 0
+    (overlay-put ol 'peek-offset 0)
+    ;; get content
+    (setq content (peek-definition--get-surrounding-text))
+    ;; go back to original place
+    (set-buffer buffer)
+    (goto-char pos)
     content))
+
+(defun peek-definition--get-content (ol)
+  "Get the content of the definition.
+This function should be called only after once called
+`peek-definition--set-marker'."
+  (let ((marker (car (overlay-get ol 'peek-markers))))
+    (message "%s" (marker-buffer marker))
+    (with-current-buffer (marker-buffer marker)
+      (save-excursion
+        (goto-char (marker-position marker))
+        (forward-line (overlay-get ol 'peek-offset))
+        (peek-definition--get-surrounding-text)))))
 
 (defun peek-overlay-get-content--string (ol)
   "Get content for overlay.  Peek-type: string.
@@ -556,20 +581,29 @@ OL: overlay."
          (bound-max (min (+ offset peek-overlay-window-size) lines-len)))
     (string-join (cl-subseq lines offset bound-max) "\n")))
 
-(defun peek-overlay-auto-set-content (ol &optional xuli)
+(defun peek-overlay-auto-set-content (ol &optional uld)
   "Automatically set content for OL.
 OL: overlay.
-WDW: window body width.
-XULI: xref use last identifier."
+ULD: use last definition.
+When ULD is nil, and peek view is _definition_ type, please also set
+`peek-definition-func' and `peek-definition-func-args'. "
   (let ((peek-type (overlay-get ol 'peek-type)))
     (cond
      ((eq peek-type 'string)
       (peek-overlay--set-content ol (peek-overlay-get-content--string ol)))
-     ((eq peek-type 'xref)
+     ((eq peek-type 'definition)
       ;; it seems like during the following operation, olivetti doesn't work immediately, do we
       ;; need to lock window-body-width before
       (let ((window-body-width (window-body-width)))
-        (peek-overlay--set-content ol (peek-overlay-get-content--xref ol xuli) window-body-width)))
+        (peek-overlay--set-content
+         ol
+         (if uld
+             (peek-definition--get-content ol)
+           (peek-definition--set-marker
+            ol
+            peek-definition-func
+            peek-definition-func-args))
+         window-body-width)))
      (t
       (error "Invalid peek-type!")))))
 
@@ -582,15 +616,15 @@ Only works when overlay is active/visible."
              ((overlay-get ol 'active))
              (peek-type (overlay-get ol 'peek-type))
              (offset (overlay-get ol 'peek-offset))
-             (bound-max (cond
-                         ((eq peek-type 'string)
-                          (1- (length (overlay-get ol 'peek-lines))))
-                         ((eq peek-type 'xref)
-                          1.0e+INF)  ; infinity
-                         (t
-                          (error "Invalid peek-type!")))))
+             (bound-max (cl-case peek-type
+                          (string
+                           (1- (length (overlay-get ol 'peek-lines))))
+                          (definition
+                           1.0e+INF)  ; infinity
+                          (t
+                           (error "Invalid peek-type!")))))
     (overlay-put ol 'peek-offset (min (1+ offset) bound-max))
-    (peek-overlay-auto-set-content ol (eq peek-type 'xref))))
+    (peek-overlay-auto-set-content ol t)))
 
 ;;;###autoload
 (defun peek-prev-line ()
@@ -601,13 +635,15 @@ Only works when overlay is active/visible."
              ((overlay-get ol 'active))
              (peek-type (overlay-get ol 'peek-type))
              (offset (overlay-get ol 'peek-offset))
-             (bound-min (cond
-                         ((or (eq peek-type 'string) (eq peek-type 'xref))
-                          0)
-                         (t
-                          (error "Invalid peek-type!")))))
+             (bound-min (cl-case peek-type
+                          (string
+                           0)
+                          (definition
+                           0)
+                          (t
+                           (error "Invalid peek-type!")))))
     (overlay-put ol 'peek-offset (max (1- offset) bound-min))
-    (peek-overlay-auto-set-content ol (eq peek-type 'xref))))
+    (peek-overlay-auto-set-content ol t)))
 
 ;;;###autoload
 (define-minor-mode global-peek-mode
@@ -650,7 +686,9 @@ things not change)."
   (unless global-peek-mode
     (global-peek-mode 1))
   (let ((ol (peek-get-or-create-window-overlay)))
-    (overlay-put ol 'peek-type 'string)
+    (unless (eq (overlay-get ol 'peek-type) 'string)
+      (overlay-put ol 'peek-offset 0)
+      (overlay-put ol 'peek-type 'string))
     (if (use-region-p)
         (progn
           (setq peek-marked-region-markers (peek--mark-region)
@@ -676,8 +714,7 @@ things not change)."
                          (split-string text "\n")))
           (peek-overlay-auto-set-content ol)
           (setq peek-marked-region-unused nil))
-        (peek-overlay--toggle-active ol)))
-    (peek-display--overlay-update ol)))
+        (peek-overlay--toggle-active ol)))))
 
 ;;;###autoload
 (defun peek-view-refresh ()
@@ -715,19 +752,40 @@ lines so the peek view can be scrolled."
     (peek-overlay-auto-set-content ol)))
 
 ;;;###autoload
-(defun peek-xref-definition-dwim ()
-  "Peek xref definition (the same behavior as you call `xref-find-definitions').
-If the peek view is deactivated/invisible, then show peek view
-for xref definition, else hide the peek view."
-  (interactive)
+(defun peek-definition (func &optional args)
+  "Peek the definition using given FUNC.
+FUNC: function.
+INTERACTIVE: whether to call FUNC interactively.
+ARGS: a list of parameters passed to the function call when INTERACTIVE is nil.
+Example: `peek-xref-definition-dwim'."
   (unless global-peek-mode
     (global-peek-mode 1))
-  (let ((ol (peek-get-or-create-window-overlay)))
-    (overlay-put ol 'peek-type 'xref)
-    (unless (overlay-get ol 'active)  ; set content before shown
-      (peek-overlay-auto-set-content ol))
-    (peek-overlay--toggle-active ol)
-    (peek-display--overlay-update ol)))
+  (let ((ol (peek-get-or-create-window-overlay))
+        (peek-definition-func func)
+        (peek-definition-func-args args))
+    
+    (unless (eq (overlay-get ol 'peek-type) 'defintion)
+      (overlay-put ol 'peek-offset 0)
+      (overlay-put ol 'peek-type 'definition))
+
+    (peek-overlay-auto-set-content ol)
+    (peek-overlay--set-active ol t)))
+
+(defun peek-get-xref-defintion-func (identifier)
+  "Get content for xref definition."
+  ;; (unless xuli
+  ;;   (overlay-put ol 'peek-last-xref (thing-at-point 'symbol)))
+  (xref-find-definitions identifier)
+  ;; clear xref history
+  (pop (car (xref--get-history))))
+
+;;;###autoload
+(defun peek-xref-definition-dwim ()
+  "Peek xref definition (the same behavior as you call `xref-find-definitions')."
+  (interactive)
+  (peek-definition
+   'peek-get-xref-defintion-func
+   (list (thing-at-point 'symbol))))
 
 (provide 'peek)
 
