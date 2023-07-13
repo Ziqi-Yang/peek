@@ -86,7 +86,7 @@
   :type 'natnum
   :group 'peek)
 
-(defcustom peek-xref-surrounding-above-lines 1
+(defcustom peek-definition-surrounding-above-lines 1
   "Number of Lines above the xref definition to be shown in peek view.
 This value should be less than the
 `peek-overlay-window-size', otherwise undefined behavior."
@@ -528,9 +528,10 @@ Only works when INTERACTIVE is t."
 
 (defun peek-definition--get-surrounding-text ()
   "Get surrounding content for xref definition.
-Get surrounding content around point from `peek-xref-surrounding-above-lines'
+Get surrounding content around point from
+`peek-definition-surrounding-above-lines'
 lines above the point with `peek-overlay-window-size' height. "
-  (let ((above peek-xref-surrounding-above-lines)
+  (let ((above peek-definition-surrounding-above-lines)
         p1 p2)
     (forward-line (- above))
     (setq p1 (point))
