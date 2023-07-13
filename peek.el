@@ -39,9 +39,9 @@
 ;;       overlay
 ;;   5. peek-offset: used for scrolling content inside peek view
 ;;   6. peek-markers:
-;;       - 'string: (begin-marker, end-marker). Used to mark the beginning
-;;         and the end of the region. Used to live update content.
-;;       - 'definition: (marker). Stores the marker of a definition. 
+;;       - 'string: (begin-marker, end-marker).  Used to mark the beginning
+;;         and the end of the region.  Used to live update content.
+;;       - 'definition: (marker).  Stores the marker of a definition.
 
 ;;; Code:
 
@@ -372,9 +372,10 @@ If WINDOW is nil, then show overlay in the current window."
   "Detect whether the two region are overlapped.
 The openness and closeness of the given regions should be the same as marker
 region.
+region1: P1, P2; region2: P3, P4
 Return boolean."
   (if (or (< p2 p1) (< p4 p3))
-      (error "p2 should >= p1, p4 should >= p3")
+      (error "P2 should >= p1, p4 should >= p3")
     (if (or (<= p4 p1) (<= p2 p3))
         nil
       t)))
@@ -385,7 +386,7 @@ Return boolean."
 
 (defun peek-display--overlay-update (&optional ol)
   "Update the overlay position if overlay is active.
-OL: overlay. Get current overlay if OL is nil."
+OL: overlay.  Get current overlay if OL is nil."
   (when-let ((ol (if (overlayp ol)
                      ol
                    (peek-get-window-overlay)))
@@ -394,7 +395,8 @@ OL: overlay. Get current overlay if OL is nil."
     (move-overlay ol pos pos)))
 
 (defun peek-after-change-function (rb re _plen)
-  "This function is used for `after-change-functions' to live update peek view."
+  "This function is used for `after-change-functions' to live update peek view.
+RB, RE, _PLEN: see `after-change-functions'."
   (dolist (ol peek-live-update-associated-overlays)
     (message "%s" (overlay-get ol 'peek-markers))
     (if (and (eq (overlay-get ol 'peek-type) 'string)
@@ -443,7 +445,7 @@ Return position."
     (cl-case peek-overlay-position
       (above (forward-line (- peek-overlay-distance)))
       (below (forward-line (1+ peek-overlay-distance)))
-      (t (error "Unrecognized value for `peek-overlay-position`.")))
+      (t (error "Unrecognized value for `peek-overlay-position`")))
     (point)))
 
 ;;;###autoload
@@ -530,7 +532,7 @@ Only works when INTERACTIVE is t."
   "Get surrounding content for xref definition.
 Get surrounding content around point from
 `peek-definition-surrounding-above-lines'
-lines above the point with `peek-overlay-window-size' height. "
+lines above the point with `peek-overlay-window-size' height."
   (let ((above peek-definition-surrounding-above-lines)
         p1 p2)
     (forward-line (- above))
@@ -565,7 +567,8 @@ FUNC, ARGS see `peek-definition'."
 (defun peek-definition--get-content (ol)
   "Get the content of the definition.
 This function should be called only after once called
-`peek-definition--set-marker'."
+`peek-definition--set-marker'.
+OL: overlay."
   (let ((marker (car (overlay-get ol 'peek-markers))))
     (message "%s" (marker-buffer marker))
     (with-current-buffer (marker-buffer marker)
@@ -588,7 +591,7 @@ OL: overlay."
 OL: overlay.
 ULD: use last definition.
 When ULD is nil, and peek view is _definition_ type, please also set
-`peek-definition-func' and `peek-definition-func-args'. "
+`peek-definition-func' and `peek-definition-func-args'."
   (let ((peek-type (overlay-get ol 'peek-type)))
     (cond
      ((eq peek-type 'string)
@@ -682,7 +685,7 @@ in the current window;
 Else toggle the display of the overlay.
 Related features:
   - store marked region
-  - hide/show peek view. "
+  - hide/show peek view."
   (interactive)
   (unless global-peek-mode
     (global-peek-mode 1))
@@ -755,7 +758,7 @@ lines so the peek view can be scrolled."
 ;;;###autoload
 (defun peek-definition (func &optional args)
   "Peek the definition using given FUNC.
-FUNC: function. This function should act like going to the definition.
+FUNC: function.  This function should act like going to the definition.
 ARGS: a list of parameters passed to the function call when INTERACTIVE is nil.
 Example: `peek-xref-definition'."
   (unless global-peek-mode
