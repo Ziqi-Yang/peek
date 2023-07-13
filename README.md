@@ -67,17 +67,19 @@ Note: this package is still in frequent updating, with function name changing po
   :straight (:type git :host sourcehut :repo "meow_king/peek")
 
   :custom
-  ;; only list some mostly-want-changed settings 
-  (peek-overlay-window-size 11) ;; lines
+  ;; only list some settings that are wanted to be chaned by most people
+  (peek-overlay-window-size 11)  ; lines
+  (peek-overlay-position 'above)  ; or below
+  (peek-overlay-distance 4)  ; the distance between peek view and the cursor point
+  
   ;; one line before the place found by `peek-definition' will also appear
   ;; in peek window. Note `peek-definition' is the underlying function of
   ;; `peek-xref-definition'
   (peek-definition-surrounding-above-lines 1)
-  (peek-overlay-position 'above) ;; or below
   
-  (peek-live-update t) ;; live update peek view of a marked region
+  (peek-live-update t)  ; live update peek view of a marked region
 
-  (peek-enable-eldoc-message-integration t) ;; enable `eldoc-message-function' integration
+  (peek-enable-eldoc-message-integration t)  ; enable `eldoc-message-function' integration
   ;; eldoc message overlay at two lines below the point
   ;; It's recommended to set the eldoc message overlay below the point since the pop up of
   ;; the peek overlay may cause visual shaking
@@ -131,12 +133,15 @@ These API may be useful for advanced customization:
 command like `peek-xref-definition`.
 
 ``` emacs-lisp
+;; goto-definition function: any number of parameters, no requirement for returned
+;; value. The only requirement is that it should act to go the the point of definition.
 (defun peek-goto-xref-defintion-func (identifier)
   "Go to the definition of IDENTIFIER."
   (xref-find-definitions identifier)
   ;; clear xref history
   (pop (car (xref--get-history))))
 
+;; integration
 (defun peek-xref-definition ()
   "Peek xref definition."
   (interactive)
