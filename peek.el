@@ -293,7 +293,7 @@ WDW: window body width"
                                 ;; terminal Emacs will pad '\' at the line end
                                 (1- window-body-width)))
          ;; NOTE temporary solution for randomly exceeding 1 border character when
-         ;; use `peek-xref-definition-dwim'
+         ;; use `peek-definition'
          (total-column-number (1- total-column-number)))
     (when display-line-numbers-mode
       (setq total-column-number
@@ -755,10 +755,9 @@ lines so the peek view can be scrolled."
 ;;;###autoload
 (defun peek-definition (func &optional args)
   "Peek the definition using given FUNC.
-FUNC: function.
-INTERACTIVE: whether to call FUNC interactively.
+FUNC: function. This function should act like going to the definition.
 ARGS: a list of parameters passed to the function call when INTERACTIVE is nil.
-Example: `peek-xref-definition-dwim'."
+Example: `peek-xref-definition'."
   (unless global-peek-mode
     (global-peek-mode 1))
   (let ((ol (peek-get-or-create-window-overlay))
@@ -772,20 +771,18 @@ Example: `peek-xref-definition-dwim'."
     (peek-overlay-auto-set-content ol)
     (peek-overlay--set-active ol t)))
 
-(defun peek-get-xref-defintion-func (identifier)
-  "Get content for xref definition."
-  ;; (unless xuli
-  ;;   (overlay-put ol 'peek-last-xref (thing-at-point 'symbol)))
+(defun peek-goto-xref-defintion-func (identifier)
+  "Go to definition of IDENTIFIER."
   (xref-find-definitions identifier)
   ;; clear xref history
   (pop (car (xref--get-history))))
 
 ;;;###autoload
-(defun peek-xref-definition-dwim ()
-  "Peek xref definition (the same behavior as you call `xref-find-definitions')."
+(defun peek-xref-definition ()
+  "Peek xref definition."
   (interactive)
   (peek-definition
-   'peek-get-xref-defintion-func
+   'peek-goto-xref-defintion-func
    (list (thing-at-point 'symbol))))
 
 (provide 'peek)

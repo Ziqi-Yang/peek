@@ -35,8 +35,8 @@ Note: this package is still in frequent updating, with function name changing po
    peek view can only be done when the source buffer(owns marked region) is alive.
    
 - Find definition of a symbol.
-   1. Use `peek-xref-definition-dwim` to show the definition at the cursor point in peek view.
-   2. Use `peek-xref-definition-dwim` again to hide the peek view. You can also use `peek-overlay-dwim` to do this job.
+   1. Use `peek-xref-definition` to show the definition at the cursor point in peek view.
+   2. Use `peek-overlay-dwim` to hide the peek view.
    
 - Display eldoc for the symbol under cursor.  
   note: you need Emacs version >= 28.1  
@@ -69,8 +69,10 @@ Note: this package is still in frequent updating, with function name changing po
   :custom
   ;; only list some mostly-want-changed settings 
   (peek-overlay-window-size 11) ;; lines
-  ;; one line before the place found by `xref-find-definitions' will also appear in peek view 
-  (peek-xref-surrounding-above-lines 1)
+  ;; one line before the place found by `peek-definition' will also appear
+  ;; in peek window. Note `peek-definition' is the underlying function of
+  ;; `peek-xref-definition'
+  (peek-definition-surrounding-above-lines 1)
   (peek-overlay-position 'above) ;; or below
   
   (peek-live-update t) ;; live update peek view of a marked region
@@ -95,7 +97,7 @@ Note: this package is still in frequent updating, with function name changing po
   
   ;; or you can use `keymap-global-set', which is introduced in emacs 29
   (global-set-key (kbd "C-x P p") #'peek-overlay-dwim)
-  (global-set-key (kbd "C-x P d") #'peek-xref-definition-dwim)
+  (global-set-key (kbd "C-x P d") #'peek-xref-definition)
   (global-set-key (kbd "C-x P m") #'peek-overlay-eldoc-message-toggle-stauts)
   (global-set-key (kbd "C-c c d") #'eldoc)
   
@@ -124,6 +126,24 @@ These API may be useful for advanced customization:
 ```
 
 - `peek-overlay-set-custom-content`, `peek-overlay-toggle`, `peek-overlay-hide`, `peek-overlay-show`
+
+- `peek-definition`. This function can be used to create custom peek definition
+command like `peek-xref-definition`.
+
+``` emacs-lisp
+(defun peek-goto-xref-defintion-func (identifier)
+  "Go to the definition of IDENTIFIER."
+  (xref-find-definitions identifier)
+  ;; clear xref history
+  (pop (car (xref--get-history))))
+
+(defun peek-xref-definition ()
+  "Peek xref definition."
+  (interactive)
+  (peek-definition
+   'peek-goto-xref-defintion-func
+   (list (thing-at-point 'symbol))))
+```
 
 
 ## Future Plan
