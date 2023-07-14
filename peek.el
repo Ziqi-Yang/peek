@@ -574,7 +574,9 @@ OL: overlay."
     (with-current-buffer (marker-buffer marker)
       (save-excursion
         (goto-char (marker-position marker))
-        (forward-line (overlay-get ol 'peek-offset))
+        (let* ((offset (overlay-get ol 'peek-offset))
+               (left-line-count (forward-line offset)))
+          (overlay-put ol 'peek-offset (- offset left-line-count)))
         (peek-definition--get-surrounding-text)))))
 
 (defun peek-overlay-get-content--string (ol)
@@ -644,10 +646,13 @@ Only works when overlay is active/visible."
                           (string
                            0)
                           (definition
-                           0)
+                           '-inf)
                           (t
-                           (error "Invalid peek-type!")))))
-    (overlay-put ol 'peek-offset (max (1- offset) bound-min))
+                           (error "Invalid peek-type!"))))
+             (next-offset (if (eq bound-min '-inf)
+                              (1- offset)
+                            (max (1- offset) bound-min))))
+    (overlay-put ol 'peek-offset next-offset)
     (peek-overlay-auto-set-content ol t)))
 
 ;;;###autoload
