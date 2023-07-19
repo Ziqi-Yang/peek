@@ -419,7 +419,7 @@ RB, RE, _PLEN: see `after-change-functions'."
             (delete ol peek-live-update-associated-overlays))))
   ;; remove hook when there is no associated overlays
   (when (= (length peek-live-update-associated-overlays) 0)
-    (remove-hook 'after-change-functions 'peek-after-change-function t)))
+    (remove-hook 'after-change-functions #'peek-after-change-function t)))
 
 (defun peek--mark-region ()
   "Get text with properties in region.
@@ -717,7 +717,7 @@ Related features:
                 ;; add this overlay to source buffer associated overlay list
                 (add-to-list 'peek-live-update-associated-overlays ol)
                 ;; add local hook
-                (add-hook 'after-change-functions 'peek-after-change-function nil t)))
+                (add-hook 'after-change-functions #'peek-after-change-function nil t)))
             (overlay-put ol 'peek-markers peek-marked-region-markers)
             (overlay-put ol 'peek-lines
                          (split-string text "\n")))
