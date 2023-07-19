@@ -48,6 +48,7 @@
 (require 'display-line-numbers)
 (require 'cl-lib)
 (require 'xref)
+(require 'subr-x)			;for `hash-table-keys'
 
 (defgroup peek nil
   "Peek mode."
@@ -56,47 +57,40 @@
 (defcustom peek-method 'overlay
   "Preferred method to display peek view."
   :type '(choice (const :tag "use overlay" overlay)
-                 (const :tag "use child frame" frame))
-  :group 'peek)
+                 (const :tag "use child frame" frame)))
 
 (defcustom peek-overlay-position 'above
   "Specify whether the overlay should be laid above the point or below the point."
   :type '(choice (const :tag "above the point" above)
-                 (const :tag "below the point" below))
-  :group 'peek)
+                 (const :tag "below the point" below)))
 
 (defcustom peek-overlay-distance 4
   "Number of the lines between the peek overlay window and the point.
 0 means directly above/below the current line."
-  :type 'natnum
-  :group 'peek)
+  :type 'natnum)
 
-(defcustom peek-overlay-border-symbol ?\N{BOX DRAWINGS LIGHT HORIZONTAL}
-  "Specify symbol for peek overlay window border."
-  :type 'character
-  :group 'peek)
+(defcustom peek-overlay-border-character ?\N{BOX DRAWINGS LIGHT HORIZONTAL}
+  "Specify symbol for peek overlay window border.
+Nil to use the similar approach as `make-separator-line'."
+  :type 'character)
 
 (defcustom peek-clean-dead-overlays-secs 3600
   "Every the given seconds to perform `peek-clean-dead-overlays' function."
-  :type 'natnum
-  :group 'peek)
+  :type 'natnum)
 
 (defcustom peek-overlay-window-size 11
   "Height of the peek overlay window.  A value of 0 may cause undefined behavior."
-  :type 'natnum
-  :group 'peek)
+  :type 'natnum)
 
 (defcustom peek-definition-surrounding-above-lines 1
   "Number of Lines above the xref definition to be shown in peek view.
 This value should be less than the
 `peek-overlay-window-size', otherwise undefined behavior."
-  :type 'natnum
-  :group 'peek)
+  :type 'natnum)
 
 (defcustom peek-live-update t
   "Whether to automatically update content when text in marked region changes."
-  :type 'boolean
-  :group 'peek)
+  :type 'boolean)
 
 (defcustom peek-mode-keymap
   (let ((map (make-sparse-keymap)))
@@ -105,87 +99,81 @@ This value should be less than the
     (define-key map (kbd "M-p") 'peek-prev-line)
     map)
   "Keymap used for peek mode."
-  :type 'keymap
-  :group 'typst)
+  :type 'keymap)
 
-(defface peek-overlay-border-face
-  ;; '((((background light))
-  ;;    :inherit font-lock-doc-face :foreground "#95a5a6")
-  ;;   (t
-  ;;    :inherit font-lock-doc-face :foreground "#ecf0f1"))
+(defface peek-overlay-ascii-border-face
   '((t (:inherit font-lock-doc-face)))
-  "Face for borders of peek overlay window."
-  :group 'peek)
+  "Face for borders of peek overlay window.")
+
+(defface peek-overlay-visual-border-face
+  `((t (:inherit separator-line :extend t)))
+  "Face for borders of peek overlay window.")
 
 (defface peek-overlay-content-face
   '((((background light))
      :background "#ecf0f1" :extend t)
     (t
      :background "#95a5a6" :extend t))
-  "Additional face for content text of peek overlay window."
-  :group 'peek)
+  "Additional face for content text of peek overlay window.")
 
 (defcustom peek-enable-eldoc-message-integration nil
   "Show eldoc message on a peek view.
 Related function: `eldoc-message-function'."
-  :type 'boolean
-  :group 'peek)
+  :type 'boolean)
 
 (defcustom peek-enable-eldoc-display-integration nil
   "Show eldoc docs inside a peek view.
 Note you need Emacs version >= 28.1.
 Related function: `eldoc-display-functions'."
-  :type 'boolean
-  :group 'peek)
+  :type 'boolean)
 
 (defcustom peek-eldoc-message-overlay-position 2
   "Number of the lines between the peek eldoc message overlay window and the point.
 0 means directly above the current line.
 < 0 means above the current line;
 > 0 means below the current line."
-  :type 'integer
-  :group 'peek)
+  :type 'integer)
 
-(defvar-local peek-eldoc-message-overlay nil
+(defvar-local peek--eldoc-message-overlay nil
   "Special overlay for handling eldoc message.
 Customize `peek-enable-eldoc-message-integration' to enable/disable this feature")
 
-(defvar peek-eldoc-message-status nil
+(defvar peek--eldoc-message-status nil
   "The value of this variable shouldn't manually edited.
 Whether peek eldoc message is in enabled status.")
 
-(defvar peek-eldoc-previous-message-function nil
+(defvar peek--eldoc-previous-message-function nil
   "Previous `eldoc-message-function'.
 Previous `eldoc-message-function' before enabling
 `peek-enable-eldoc-message-integration'.  Note you are supposed not to
 manually change `eldoc-message-function' between enabling and disabling
 the `global-peek-mode'.")
 
-(defvar-local peek-window-overlay-map nil
-  ;; (make-hash-table :test 'equal) ;; we need to manually set hash table for each buffer, otherwise we always change its global value
-  "This variable shouldn't be customized by user.
-Variable structure: { window: overlay }.")
+(defvar-local peek--window-overlay-map nil
+  ;; we need to manually set hash table for each buffer, otherwise we will
+  ;; always change its global value
+  "Buffer-local window-overlay map.")
 
-(defvar-local peek-live-update-associated-overlays nil
+(defvar-local peek--live-update-associated-overlays nil
   "Associated overlays for this buffer.
 This variable is used to update associated overlays when certain part of this
 buffer change.
 Related hook: `after-change-functions'.")
 
-(defvar peek-marked-region-markers nil
+(defvar peek--marked-region-markers nil
   "Store the last stored marked region markers (beginning marker . end marker).")
 
-(defvar peek-marked-region-unused nil
-  "Indicate that `peek-marked-region-markers' hasn't been used.
+(defvar peek--marked-region-unused nil
+  "Indicate that `peek--marked-region-markers' hasn't been used.
 This variable is used to make sure that the right peek overlay show after
 storing a marked region can cross buffers.
 So later peek view toggles are still buffer-local.")
 
-(defvar peek-definition-func nil
+(defvar peek--definition-func nil
   "This variable stores a function which is used to go to definition.")
 
-(defvar peek-definition-func-args nil
-  "This variable stores the arguments passed to `peek-definition-func'.")
+(defvar peek--definition-func-args nil
+  "This variable stores the arguments passed to `peek--definition-func'.")
 
 ;;; =============================================================================
 ;;; Base Functions
@@ -193,16 +181,16 @@ So later peek view toggles are still buffer-local.")
 
 (defun peek--ensure-window-overlay-map ()
   "If the hash table for current buffer hasn't been initialized, then create it."
-  (unless peek-window-overlay-map
-    (setq-local peek-window-overlay-map (make-hash-table :test 'equal))))
+  (unless peek--window-overlay-map
+    (setq-local peek--window-overlay-map (make-hash-table :test 'equal))))
 
 (defun peek-clean-dead-overlays (&rest _args)
   "This function clean those overlays existed in dead windows in all buffers."
   (peek--ensure-window-overlay-map)
   (dolist (buffer (buffer-list))
     (with-current-buffer buffer
-      (when-let (((hash-table-p peek-window-overlay-map))
-                 (windows (hash-table-keys peek-window-overlay-map)))
+      (when-let (((hash-table-p peek--window-overlay-map))
+                 (windows (hash-table-keys peek--window-overlay-map)))
         (dolist (window windows)
           (unless (window-live-p window)
             (peek-delete-window-overlay window)))))))
@@ -214,8 +202,8 @@ So later peek view toggles are still buffer-local.")
   (peek--ensure-window-overlay-map)
   (dolist (buffer (buffer-list))
     (with-current-buffer buffer
-      (when-let (((hash-table-p peek-window-overlay-map))
-                 (windows (hash-table-keys peek-window-overlay-map)))
+      (when-let (((hash-table-p peek--window-overlay-map))
+                 (windows (hash-table-keys peek--window-overlay-map)))
         (dolist (window windows)
           (peek-delete-window-overlay window))))))
 
@@ -227,7 +215,7 @@ Return nil if there is no overlay in the window"
   (let ((w (if (windowp window)  ; no matter live or not
                window
              (get-buffer-window))))
-    (gethash w peek-window-overlay-map)))
+    (gethash w peek--window-overlay-map)))
 
 (defun peek-delete-window-overlay (&optional window)
   "Delete the overlay inside WINDOW.
@@ -236,8 +224,8 @@ If WINDOW is nil, then delete the overlay inside the current window."
   (let ((w (if (windowp window)  ; no matter live or not
                window
              (get-buffer-window))))
-    (delete-overlay (gethash w peek-window-overlay-map))
-    (remhash w peek-window-overlay-map)))
+    (delete-overlay (gethash w peek--window-overlay-map))
+    (remhash w peek--window-overlay-map)))
 
 (defun peek-create-overlay (pos)
   "Create overlay for currently window.
@@ -253,7 +241,7 @@ Return the newly created overlay."
     (overlay-put ol 'peek-lines  '())
     (overlay-put ol 'peek-offset 0)
     (overlay-put ol 'peek-last-xref "")
-    (puthash (get-buffer-window) ol peek-window-overlay-map)))
+    (puthash (get-buffer-window) ol peek--window-overlay-map)))
 
 (defun peek-get-or-create-window-overlay (&optional window)
   "Get or create a overlay for WINDOW.
@@ -285,22 +273,24 @@ otherwise this function does nothing."
   "Return the border string which is supposed to be used in overlay.
 WDW: window body width"
   ;; note that `display-line-numbers-mode' takes 2 + `line-number-display-width' columns
-  (let* ((window-body-width (if wdw
-                                wdw
-                              (window-body-width)))
-         (total-column-number (if (display-graphic-p)
-                                  window-body-width
-                                ;; terminal Emacs will pad '\' at the line end
-                                (1- window-body-width)))
-         ;; NOTE temporary solution for randomly exceeding 1 border character when
-         ;; use `peek-definition'
-         (total-column-number (1- total-column-number)))
-    (when display-line-numbers-mode
-      (setq total-column-number
-            (- total-column-number (+ 2 (line-number-display-width)))))
-    (propertize
-     (concat (make-string total-column-number peek-overlay-border-symbol) "\n")
-     'face 'peek-overlay-border-face)))
+  (if peek-overlay-border-character
+      (let* ((window-body-width (if wdw
+                                    wdw
+                                  (window-body-width)))
+             (total-column-number (if (display-graphic-p)
+                                      window-body-width
+                                    ;; terminal Emacs will pad '\' at the line end
+                                    (1- window-body-width)))
+             ;; NOTE temporary solution for randomly exceeding 1 border character when
+             ;; use `peek-definition'
+             (total-column-number (1- total-column-number)))
+        (when display-line-numbers-mode
+          (setq total-column-number
+                (- total-column-number (+ 2 (line-number-display-width)))))
+        (propertize
+         (concat (make-string total-column-number peek-overlay-border-character) "\n")
+         'face 'peek-overlay-ascii-border-face))
+    (propertize "\n" 'face 'peek-overlay-visual-border-face)))
 
 (defun peek-overlay--format-content (str &optional wdw)
   "Format peek overlay content and return the formatted string.
@@ -368,17 +358,15 @@ If WINDOW is nil, then show overlay in the current window."
   (let ((ol (peek-get-window-overlay window)))
     (peek-overlay--toggle-active ol)))
 
-(defun peek--regions-overlap (p1 p2 p3 p4)
+(defun peek--regions-overlap (r1s r1e r2s r2e)
   "Detect whether the two region are overlapped.
 The openness and closeness of the given regions should be the same as marker
 region.
-region1: P1, P2; region2: P3, P4
+region1: R1S, R1E; region2: R2S, R2E
 Return boolean."
-  (if (or (< p2 p1) (< p4 p3))
-      (error "P2 should >= p1, p4 should >= p3")
-    (if (or (<= p4 p1) (<= p2 p3))
-        nil
-      t)))
+  (if (or (< r1e r1s) (< r2e r2s))
+      (error "R1S should >= R1E, R2S should >= R2E")
+    (not (or (<= r2e r1s) (<= r1e r2s)))))
 
 ;;; =============================================================================
 ;;; Main Functions
@@ -397,7 +385,7 @@ OL: overlay.  Get current overlay if OL is nil."
 (defun peek-after-change-function (rb re _plen)
   "This function is used for `after-change-functions' to live update peek view.
 RB, RE, _PLEN: see `after-change-functions'."
-  (dolist (ol peek-live-update-associated-overlays)
+  (dolist (ol peek--live-update-associated-overlays)
     (message "%s" (overlay-get ol 'peek-markers))
     (if (and (eq (overlay-get ol 'peek-type) 'string)
              (consp (overlay-get ol 'peek-markers))  ; string from region
@@ -415,10 +403,10 @@ RB, RE, _PLEN: see `after-change-functions'."
                          (split-string text "\n"))
             (peek-overlay-auto-set-content ol)))
       ;; remove ol when ol's source buffer isn't the current buffer
-      (setq peek-live-update-associated-overlays
-            (delete ol peek-live-update-associated-overlays))))
+      (setq peek--live-update-associated-overlays
+            (delete ol peek--live-update-associated-overlays))))
   ;; remove hook when there is no associated overlays
-  (when (= (length peek-live-update-associated-overlays) 0)
+  (when (= (length peek--live-update-associated-overlays) 0)
     (remove-hook 'after-change-functions #'peek-after-change-function t)))
 
 (defun peek--mark-region ()
@@ -433,8 +421,7 @@ Return nil if there is no region."
            (me (make-marker)))
       (set-marker mb rb (current-buffer))
       (set-marker me re (current-buffer))
-      
-      (setq mark-active nil)  ; deactivate region mark
+      (deactivate-mark)
       (cons mb me))))
 
 (defun peek-overlay--get-supposed-position ()
@@ -451,18 +438,18 @@ Return position."
 ;;;###autoload
 (defun peek-overlay-eldoc-message-hide ()
   "Hide peek eldoc message overlay."
-  (when peek-eldoc-message-overlay
-    (peek-overlay--set-active peek-eldoc-message-overlay nil)))
+  (when peek--eldoc-message-overlay
+    (peek-overlay--set-active peek--eldoc-message-overlay nil)))
 
 ;;;###autoload
 (defun peek-overlay-eldoc-message-enable ()
   "Show peek eldoc message overlay."
   (interactive)
   (add-hook 'post-command-hook #'peek-overlay-eldoc-message-hide)
-  (setq peek-eldoc-message-status t)
-  ;; avoid covering `peek-eldoc-previous-message-function'
+  (setq peek--eldoc-message-status t)
+  ;; avoid covering `peek--eldoc-previous-message-function'
   (unless (eq eldoc-message-function 'peek-overlay-eldoc-message-function)
-    (setq peek-eldoc-previous-message-function eldoc-message-function
+    (setq peek--eldoc-previous-message-function eldoc-message-function
           eldoc-message-function 'peek-overlay-eldoc-message-function)))
 
 ;;;###autoload
@@ -471,14 +458,14 @@ Return position."
   (interactive)
   (peek-overlay-eldoc-message-hide)
   (remove-hook 'post-command-hook #'peek-overlay-eldoc-message-hide)
-  (setq peek-eldoc-message-status nil
-        eldoc-message-function peek-eldoc-previous-message-function))
+  (setq peek--eldoc-message-status nil
+        eldoc-message-function peek--eldoc-previous-message-function))
 
 ;;;###autoload
 (defun peek-overlay-eldoc-message-toggle-stauts ()
   "Toggle (enable/disable) peek eldoc message overlay."
   (interactive)
-  (if peek-eldoc-message-status
+  (if peek--eldoc-message-status
       (peek-overlay-eldoc-message-disable)
     (peek-overlay-eldoc-message-enable)))
 
@@ -486,8 +473,8 @@ Return position."
 (defun peek-overlay-eldoc-message-function (format-string &rest args)
   "Display peek overlay window FORMAT-STRING under point with extra ARGS."
   (when-let ((format-string)
-             (ol (if peek-eldoc-message-overlay
-                     peek-eldoc-message-overlay
+             (ol (if peek--eldoc-message-overlay
+                     peek--eldoc-message-overlay
                    (let ((ol (make-overlay 1 1)))
                      (overlay-put ol 'window (get-buffer-window))
                      (overlay-put ol 'active nil)
@@ -495,7 +482,7 @@ Return position."
                      (overlay-put ol 'peek-lines  '())
                      (overlay-put ol 'peek-offset 0)
                      (overlay-put ol 'peek-last-xref "")
-                     (setq peek-eldoc-message-overlay ol))))
+                     (setq peek--eldoc-message-overlay ol))))
              (pos (peek-overlay-eldoc-message--get-supposed-position)))
     (move-overlay ol pos pos)
     (peek-overlay--set-active ol t)
@@ -512,11 +499,11 @@ Return position."
     (point)))
 
 ;;;###autoload
-(when (>= emacs-major-version 28)
-  (defun peek-display-eldoc (docs interactive)
-    "Related function: `eldoc-display-functions'.
+(defun peek-display-eldoc (docs interactive)
+  "Related function: `eldoc-display-functions'.
 DOCS: docs passed by eldoc.
 Only works when INTERACTIVE is t."
+  (when (>= emacs-major-version 28)
     (when-let ((interactive)
                (docs-content (with-current-buffer (eldoc--format-doc-buffer docs)
                                (buffer-string)))
@@ -593,7 +580,7 @@ OL: overlay."
 OL: overlay.
 ULD: use last definition.
 When ULD is nil, and peek view is _definition_ type, please also set
-`peek-definition-func' and `peek-definition-func-args'."
+`peek--definition-func' and `peek--definition-func-args'."
   (let ((peek-type (overlay-get ol 'peek-type)))
     (cond
      ((eq peek-type 'string)
@@ -608,8 +595,8 @@ When ULD is nil, and peek view is _definition_ type, please also set
              (peek-definition--get-content ol)
            (peek-definition--set-marker
             ol
-            peek-definition-func
-            peek-definition-func-args))
+            peek--definition-func
+            peek--definition-func-args))
          window-body-width)))
      (t
       (error "Invalid peek-type!")))))
@@ -627,7 +614,7 @@ Only works when overlay is active/visible."
                           (string
                            (1- (length (overlay-get ol 'peek-lines))))
                           (definition
-                           1.0e+INF)  ; infinity
+                           1.0e+INF)  ; infinity (buffer end)
                           (t
                            (error "Invalid peek-type!")))))
     (overlay-put ol 'peek-offset (min (1+ offset) bound-max))
@@ -700,14 +687,14 @@ Related features:
           (unless (eq (overlay-get ol 'peek-type) 'string)
             (overlay-put ol 'peek-offset 0)
             (overlay-put ol 'peek-type 'string))
-          (setq peek-marked-region-markers (peek--mark-region)
-                peek-marked-region-unused t)
+          (setq peek--marked-region-markers (peek--mark-region)
+                peek--marked-region-unused t)
           (message "region stored"))
       (progn
         (when (and (eq (overlay-get ol 'active) nil)  ; after toggle, overlay show
-                   (eq peek-marked-region-unused t))
-          (let* ((mb (car peek-marked-region-markers))
-                 (me (cdr peek-marked-region-markers))
+                   (eq peek--marked-region-unused t))
+          (let* ((mb (car peek--marked-region-markers))
+                 (me (cdr peek--marked-region-markers))
                  (source-buffer (marker-buffer mb))
                  (text (with-current-buffer source-buffer
                          (buffer-substring
@@ -715,14 +702,14 @@ Related features:
             (when peek-live-update
               (with-current-buffer source-buffer
                 ;; add this overlay to source buffer associated overlay list
-                (add-to-list 'peek-live-update-associated-overlays ol)
+                (add-to-list 'peek--live-update-associated-overlays ol)
                 ;; add local hook
                 (add-hook 'after-change-functions #'peek-after-change-function nil t)))
-            (overlay-put ol 'peek-markers peek-marked-region-markers)
+            (overlay-put ol 'peek-markers peek--marked-region-markers)
             (overlay-put ol 'peek-lines
                          (split-string text "\n")))
           (peek-overlay-auto-set-content ol)
-          (setq peek-marked-region-unused nil))
+          (setq peek--marked-region-unused nil))
         (peek-overlay--toggle-active ol)))))
 
 ;;;###autoload
@@ -769,8 +756,8 @@ Example: `peek-xref-definition'."
   (unless global-peek-mode
     (global-peek-mode 1))
   (let ((ol (peek-get-or-create-window-overlay))
-        (peek-definition-func func)
-        (peek-definition-func-args args))
+        (peek--definition-func func)
+        (peek--definition-func-args args))
     
     (unless (eq (overlay-get ol 'peek-type) 'defintion)
       (overlay-put ol 'peek-offset 0)

@@ -69,6 +69,12 @@ Note: this package is still in frequent updating, with function name changing po
   :custom
   ;; only list some settings that are wanted to be chaned by most people
   (peek-overlay-window-size 11)  ; lines
+  ;; you can also set `peek-overlay-border-character' to nil to achieve a similar
+  ;; looking as `make-separator-line', which is useful when you find there is a wrong
+  ;; number of border characters when using default settings. However, in this case,
+  ;; please consider report a bug.
+  (peek-overlay-border-character ?\N{BOX DRAWINGS LIGHT HORIZONTAL})
+  
   (peek-overlay-position 'above)  ; or below
   (peek-overlay-distance 4)  ; the distance between peek view and the cursor point
   

@@ -4,6 +4,7 @@
 
 (setq
  ;; peek-live-update nil
+ peek-overlay-border-symbol nil
  peek-enable-eldoc-message-integration t
  peek-enable-eldoc-display-integration t)
 
