@@ -156,6 +156,11 @@ command like `peek-xref-definition`.
    (list (thing-at-point 'symbol))))
 ```
 
+## Derived Projects
+
+- [peek-collection](https://git.sr.ht/~meow_king/peek-collection): A collection 
+of convenient integration for Emacs package Peek. 
+
 
 ## Future Plan
 
