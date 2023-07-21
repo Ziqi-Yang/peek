@@ -1,9 +1,10 @@
 ;;; peek.el --- Peek anything at your fingertip  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2023 Ziqi Yang <mr.meowking@anche.no>
+;; Copyright (C) 2023 Free Software Foundation, Inc.
 
 ;; Version: 0.1.0
 ;; Author: Ziqi Yang <mr.meowking@anche.no>
+;; Maintainer: Ziqi Yang <mr.meowking@anche.no>
 ;; Keywords: convenience, tools
 ;; URL: https://sr.ht/~meow_king/peek
 ;; License: GNU General Public License >= 3
