@@ -751,7 +751,7 @@ lines so the peek view can be scrolled."
 (defun peek-definition (func &optional args)
   "Peek the definition using given FUNC.
 FUNC: function.  This function should act like going to the definition.
-ARGS: a list of parameters passed to the function call when INTERACTIVE is nil.
+ARGS: a list of parameters passed to the function call.
 Example: `peek-xref-definition'."
   (unless global-peek-mode
     (global-peek-mode 1))
