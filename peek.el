@@ -269,28 +269,38 @@ otherwise this function does nothing."
         (overlay-put ol 'active nil)
         (overlay-put ol 'after-string (propertize after-str 'display ""))))))
 
+(defun peek-overlay--protect-string-looking (str)
+  "Protect string looking by adding a _default_ property to it.
+STR: string.
+Return STR, but it is not required to use it. The return statement is just for
+easy programming."
+  (let ((strlen (length str)))
+    (add-face-text-property 0 strlen 'default 'append str)
+    str))
+
 (defun peek-overlay--format-make-border (&optional wdw)
   "Return the border string which is supposed to be used in overlay.
 WDW: window body width"
   ;; note that `display-line-numbers-mode' takes 2 + `line-number-display-width' columns
-  (if peek-overlay-border-character
-      (let* ((window-body-width (if wdw
-                                    wdw
-                                  (window-body-width)))
-             (total-column-number (if (display-graphic-p)
-                                      window-body-width
-                                    ;; terminal Emacs will pad '\' at the line end
-                                    (1- window-body-width)))
-             ;; NOTE temporary solution for randomly exceeding 1 border character when
-             ;; use `peek-definition'
-             (total-column-number (1- total-column-number)))
-        (when display-line-numbers-mode
-          (setq total-column-number
-                (- total-column-number (+ 2 (line-number-display-width)))))
-        (propertize
-         (concat (make-string total-column-number peek-overlay-border-character) "\n")
-         'face 'peek-overlay-ascii-border-face))
-    (propertize "\n" 'face 'peek-overlay-visual-border-face)))
+  (peek-overlay--protect-string-looking
+   (if peek-overlay-border-character
+       (let* ((window-body-width (if wdw
+                                     wdw
+                                   (window-body-width)))
+              (total-column-number (if (display-graphic-p)
+                                       window-body-width
+                                     ;; terminal Emacs will pad '\' at the line end
+                                     (1- window-body-width)))
+              ;; NOTE temporary solution for randomly exceeding 1 border character when
+              ;; use `peek-definition'
+              (total-column-number (1- total-column-number)))
+         (when display-line-numbers-mode
+           (setq total-column-number
+                 (- total-column-number (+ 2 (line-number-display-width)))))
+         (propertize
+          (concat (make-string total-column-number peek-overlay-border-character) "\n")
+          'face 'peek-overlay-ascii-border-face))
+     (propertize "\n" 'face 'peek-overlay-visual-border-face))))
 
 (defun peek-overlay--format-content (str &optional wdw)
   "Format peek overlay content and return the formatted string.
@@ -302,7 +312,7 @@ Return: formatted string which is supposed to be inserted into overlay."
     ;; `default' face is appended to make sure the display in overlay
     ;; is not affected by its surroundings.
     (add-face-text-property 0 strlen 'peek-overlay-content-face 'append str)
-    (add-face-text-property 0 strlen 'default 'append str)
+    (peek-overlay--protect-string-looking str)
     (concat
      border
      str
