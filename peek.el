@@ -298,6 +298,9 @@ WDW: window body width"
          (when display-line-numbers-mode
            (setq total-column-number
                  (- total-column-number (+ 2 (line-number-display-width)))))
+         ;; NOTE temporary fix for `line-prefix' (example: `org-index-mode')
+         (let ((line-prefix-len (length (get-text-property (point) 'line-prefix))))
+           (setq total-column-number (- total-column-number line-prefix-len)))
          (propertize
           (concat (make-string total-column-number peek-overlay-border-character) "\n")
           'face 'peek-overlay-ascii-border-face))
