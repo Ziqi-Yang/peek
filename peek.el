@@ -36,10 +36,10 @@
 ;;   2. peek-type: indicate the current type of overlay
 ;;       - 'string : marked region or eldoc message
 ;;       - 'definition
-;;   3. peek-lines: list of string, only stores strings for 'string type
-;;       overlay
-;;   5. peek-offset: used for scrolling content inside peek view
-;;   6. peek-markers:
+;;   3. peek-lines:
+;;       - 'string: list of string, lines
+;;   4. peek-offset: used for scrolling content inside peek view
+;;   5. peek-markers:
 ;;       - 'string: (begin-marker, end-marker).  Used to mark the beginning
 ;;         and the end of the region.  Used to live update content.
 ;;       - 'definition: (marker).  Stores the marker of a definition.
@@ -254,21 +254,28 @@ If there isn't one, the create it."
       (setq ol (peek-create-overlay (peek-overlay--get-supposed-position))))
     ol))
 
+(defun peek-overlay-get-content (ol)
+  "Get the content of OL, namely the value of `after-string' property at the
+time when OL is active."
+  (let ((peek-type (overlay-get ol 'peek-type)))
+    (pcase peek-type
+      ('string (peek-overlay-get-content--string ol))
+      ('definition (peek-overlay-get-content--definition ol)))))
+
 (defun peek-overlay--set-active (ol active)
   "Set active/visibility of the given overlay.
 OL: overlay object
 ACTIVE: boolean type: t stands for visible, nil stands for invisible
 Please ensure `after-string' property of OL isn't nil,
 otherwise this function does nothing."
-  (when-let (((booleanp active)) ;; ensure `active' is nil or t
-             (after-str (overlay-get ol 'after-string)))  ; ensure after-str isn't nil
+  (when-let (((booleanp active))) ;; ensure `active' is nil or t
     (if active
         (progn
           (overlay-put ol 'active t)
-          (overlay-put ol 'after-string (propertize after-str 'display nil)))
+          (peek-overlay--set-content ol (peek-overlay-get-content ol)))
       (progn
         (overlay-put ol 'active nil)
-        (overlay-put ol 'after-string (propertize after-str 'display ""))))))
+        (overlay-put ol 'after-string nil)))))
 
 (defun peek-overlay--protect-string-looking (str)
   "Protect string looking by adding a _default_ property to it.
@@ -332,12 +339,9 @@ STR: original content string.  It will be formatted using
 `peek-overlay--format-content' method before being inserted into OL.
 WDW: window body width."
   ;; set `after-string' property according to current `active' property
-  (let ((display (if (overlay-get ol 'active)
-                     nil
-                   ""))
-        (content (peek-overlay--format-content str wdw)))
-    (overlay-put ol 'after-string
-                 (propertize content 'display display))))
+  (when-let ((active (overlay-get ol 'active))
+             (content (peek-overlay--format-content str wdw)))
+    (overlay-put ol 'after-string content)))
 
 (defun peek-overlay--toggle-active (ol)
   "Set active/visibility of the given overlay.
@@ -534,14 +538,16 @@ Only works when INTERACTIVE is t."
 Get surrounding content around point from
 `peek-definition-surrounding-above-lines'
 lines above the point with `peek-overlay-window-size' height."
-  (let ((above peek-definition-surrounding-above-lines)
-        p1 p2)
-    (forward-line (- above))
-    (setq p1 (point))
-    (forward-line (+ above peek-overlay-window-size))
-    (setq p2 (line-end-position))
-    (font-lock-ensure p1 p2)
-    (buffer-substring p1 p2)))
+  (if (eq major-mode 'image-mode)
+      (propertize " " 'display (get-text-property 1 'display))
+    (let ((above peek-definition-surrounding-above-lines)
+          p1 p2)
+      (forward-line (- above))
+      (setq p1 (point))
+      (forward-line (+ above peek-overlay-window-size))
+      (setq p2 (line-end-position))
+      (font-lock-ensure p1 p2)
+      (buffer-substring p1 p2))))
 
 (defun peek-definition--set-marker (ol func &optional args)
   "Call get definition function, set marker of that function and get the content.
@@ -565,13 +571,12 @@ FUNC, ARGS see `peek-definition'."
     (goto-char pos)
     content))
 
-(defun peek-definition--get-content (ol)
+(defun peek-overlay-get-content--definition (ol)
   "Get the content of the definition.
 This function should be called only after once called
 `peek-definition--set-marker'.
 OL: overlay."
   (let ((marker (car (overlay-get ol 'peek-markers))))
-    (message "%s" (marker-buffer marker))
     (with-current-buffer (marker-buffer marker)
       (save-excursion
         (goto-char (marker-position marker))
@@ -606,7 +611,7 @@ When ULD is nil, and peek view is _definition_ type, please also set
         (peek-overlay--set-content
          ol
          (if uld
-             (peek-definition--get-content ol)
+             (peek-overlay-get-content--definition ol)
            (peek-definition--set-marker
             ol
             peek--definition-func
@@ -711,8 +716,10 @@ Related features:
                  (me (cdr peek--marked-region-markers))
                  (source-buffer (marker-buffer mb))
                  (text (with-current-buffer source-buffer
-                         (buffer-substring
-                          (marker-position mb) (marker-position me)))))
+                         (if (eq major-mode 'image-mode)
+                             (propertize " " 'display (get-text-property 1 'display))
+                           (buffer-substring
+                            (marker-position mb) (marker-position me))))))
             (when peek-live-update
               (with-current-buffer source-buffer
                 ;; add this overlay to source buffer associated overlay list

@@ -15,7 +15,16 @@ Note: this package is still in frequent updating, with function name changing po
 4. Peek the destination of `xref-find-definitions`.
 5. `eldoc-message-function` and `eldoc-display-functions` integration.
 6. Scroll up or down inside peek view. 
-7. live update
+7. Live update
+8. Image Preview
+   - Support
+     - image presentation using a string which has no `\n` inside and uses `display` text property
+     to show image, like `insert-image` with default `STRING` parameter or `insert-image-file` function.
+     - image mode
+   - Doesn't Support:
+     - image presentation using a overlay which uses `display` text property on its `before-string`
+     or `after-string`, like `put-image`
+
 
 ## Demo
 
