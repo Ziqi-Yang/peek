@@ -503,9 +503,9 @@ Return position."
                      (setq peek--eldoc-message-overlay ol))))
              (pos (peek-overlay-eldoc-message--get-supposed-position)))
     (move-overlay ol pos pos)
-    (peek-overlay--set-active ol t)
     (overlay-put ol 'peek-lines (split-string (apply #'format-message format-string args) "\n"))
-    (peek-overlay-auto-set-content ol)))
+    (peek-overlay-auto-set-content ol)
+    (peek-overlay--set-active ol t)))
 
 (defun peek-overlay-eldoc-message--get-supposed-position ()
   "Get supposed eldoc message overlay position.
@@ -529,6 +529,7 @@ Only works when INTERACTIVE is t."
       (overlay-put ol 'peek-type 'string)
       (overlay-put ol 'peek-lines
                    (split-string docs-content "\n"))
+      (overlay-put ol 'peek-offset 0)
       (peek-overlay-auto-set-content ol)
       (peek-overlay--set-active ol t)
       (peek-display--overlay-update ol))))
@@ -703,15 +704,15 @@ Related features:
   (let ((ol (peek-get-or-create-window-overlay)))
     (if (use-region-p)
         (progn
-          (unless (eq (overlay-get ol 'peek-type) 'string)
-            (overlay-put ol 'peek-offset 0)
-            (overlay-put ol 'peek-type 'string))
           (setq peek--marked-region-markers (peek--mark-region)
                 peek--marked-region-unused t)
           (message "region stored"))
       (progn
+        (when (eq (overlay-get ol 'peek-type) 'definition)
+          (overlay-put ol 'peek-type 'string))
         (when (and (eq (overlay-get ol 'active) nil)  ; after toggle, overlay show
                    (eq peek--marked-region-unused t))
+          (overlay-put ol 'peek-offset 0)
           (let* ((mb (car peek--marked-region-markers))
                  (me (cdr peek--marked-region-markers))
                  (source-buffer (marker-buffer mb))
